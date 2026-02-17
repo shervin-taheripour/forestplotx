@@ -4,6 +4,112 @@ import pandas as pd
 from matplotlib.ticker import FuncFormatter, NullLocator, NullFormatter
 from matplotlib.patches import Rectangle
 
+
+def _normalize_model_output(df, model_type):
+    """
+    Normalize model output to standardized columns and apply
+    model-appropriate transformations.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Model output containing an effect column (one of "OR", "Ratio",
+        "Estimate", "beta", "Coef", "effect"), plus "CI_low"/"ci_low",
+        "CI_high"/"ci_high", and "p_value".
+    model_type : {"binom", "exp", "linear", "ordinal"}
+
+    Returns
+    -------
+    clean_df : pd.DataFrame
+        Copy with columns renamed to ``effect``, ``ci_low``, ``ci_high``,
+        ``p_value``.  For binom/exp/ordinal the effect and CI columns are
+        exponentiated.  For ordinal, threshold/cutpoint/intercept rows are
+        removed.
+    config : dict
+        Keys: ``x_label``, ``reference_line``, ``use_log``, ``effect_label``.
+    """
+    _EFFECT_CANDIDATES = ["OR", "Ratio", "Estimate", "beta", "Coef", "effect"]
+
+    _CONFIG = {
+        "binom": {
+            "x_label": "Odds Ratio (log scale)",
+            "reference_line": 1.0,
+            "use_log": True,
+            "effect_label": "OR",
+        },
+        "exp": {
+            "x_label": "Relative Mean",
+            "reference_line": 1.0,
+            "use_log": False,
+            "effect_label": "Ratio",
+        },
+        "linear": {
+            "x_label": "Effect Size (linear scale)",
+            "reference_line": 0.0,
+            "use_log": False,
+            "effect_label": "Coef",
+        },
+        "ordinal": {
+            "x_label": "Odds Ratio (ordinal logit)",
+            "reference_line": 1.0,
+            "use_log": True,
+            "effect_label": "OR",
+        },
+    }
+
+    if model_type not in _CONFIG:
+        raise ValueError(
+            f"Unknown model_type '{model_type}'. "
+            f"Use one of: {list(_CONFIG.keys())}"
+        )
+
+    config = _CONFIG[model_type]
+    df = df.copy()
+
+    # --- Detect effect column ------------------------------------------------
+    effect_col = None
+    for candidate in _EFFECT_CANDIDATES:
+        if candidate in df.columns:
+            effect_col = candidate
+            break
+
+    if effect_col is None:
+        raise ValueError(
+            f"No effect column found. Expected one of: {_EFFECT_CANDIDATES}"
+        )
+
+    # --- Rename to standard names --------------------------------------------
+    rename = {}
+    if effect_col != "effect":
+        rename[effect_col] = "effect"
+    if "CI_low" in df.columns:
+        rename["CI_low"] = "ci_low"
+    if "CI_high" in df.columns:
+        rename["CI_high"] = "ci_high"
+    if rename:
+        df = df.rename(columns=rename)
+
+    # --- Ordinal: drop threshold / cutpoint / intercept rows -----------------
+    if model_type == "ordinal":
+        if "predictor" not in df.columns:
+            raise ValueError("Ordinal model requires a 'predictor' column.")
+        mask = df["predictor"].str.contains(
+            r"(?i)^(?:threshold|cutpoint|intercept)", na=False, regex=True
+        )
+        df = df[~mask]
+
+    # --- Exponentiate for non-linear link functions --------------------------
+    if (
+        model_type in ("binom", "ordinal", "exp")
+        and effect_col in ("Estimate", "beta", "Coef")
+    ):
+        for col in ("effect", "ci_low", "ci_high"):
+            if col in df.columns:
+                df[col] = np.exp(df[col])
+
+    return df, config
+
+
 def detailed_forest_plot(
     df_final, 
     cat_palette=None, 
@@ -23,7 +129,7 @@ def detailed_forest_plot(
     max_decimals=4,
     show_general_stats: bool = True,
     bold_override: dict | None = None,
-    num_ticks: int = 5,  # <--- New argument, or just edit here if you don't want as a parameter
+    num_ticks: int = 5,
 ):
     """
     Create a detailed forest plot with table and optional footer + frame.
@@ -48,31 +154,13 @@ def detailed_forest_plot(
         outcomes = outcomes[:2]
     has_second = len(outcomes) == 2
 
-    if model_type == "binom":
-        effect_label, effect_col, ci_label, xlabel = "OR", "OR", "95% CI", "Odds Ratio (log scale)"
-        ref_val, null_value = 1.0, 1.0
-        bold_low, bold_high = binom_threshold
-        def is_effect_bold(eff): return pd.notnull(eff) and (eff < bold_low or eff > bold_high)
-        use_log = True
-    elif model_type == "exp":
-        effect_label, effect_col, ci_label, xlabel = "Ratio", "Ratio" if "Ratio" in df_final.columns else "OR", "95% CI", "Relative Mean"
-        ref_val, null_value = 1.0, 1.0
-        bold_low, bold_high = exp_threshold
-        def is_effect_bold(eff): return pd.notnull(eff) and (eff < bold_low or eff > bold_high)
-        use_log = False
-    elif model_type == "linear":
-        effect_label, effect_col, ci_label, xlabel = "Coef", "Coef" if "Coef" in df_final.columns else "OR", "95% CI", "Effect Size (linear scale)"
-        ref_val, null_value = 0.0, 0.0
-        def is_effect_bold(eff): return pd.notnull(eff) and abs(eff) > linear_threshold
-        use_log = False
-    elif model_type == "ordinal":
-        effect_label, effect_col, ci_label, xlabel = "OR", "OR", "95% CI", "Odds Ratio (ordinal logit)"
-        ref_val, null_value = 1.0, 1.0
-        bold_low, bold_high = binom_threshold
-        def is_effect_bold(eff): return pd.notnull(eff) and (eff < bold_low or eff > bold_high)
-        use_log = True
-    else:
-        raise ValueError("Unknown model_type. Use 'binom', 'exp', or 'linear'.")
+    # --- Normalize model output ----------------------------------------------
+    df_final, plot_config = _normalize_model_output(df_final, model_type)
+    effect_label = plot_config["effect_label"]
+    ref_val      = plot_config["reference_line"]
+    use_log      = plot_config["use_log"]
+    xlabel       = plot_config["x_label"]
+    ci_label     = "95% CI"
 
     def format_effect_ci_p(eff, lo, hi, p):
         d = base_decimals
@@ -114,7 +202,7 @@ def detailed_forest_plot(
             gridspec_kw={"width_ratios": [1.9, 1.1]}
         )
         plt.subplots_adjust(wspace=0.02)
-        plt.subplots_adjust(bottom=0.12)  # or try 0.15 for more space
+        plt.subplots_adjust(bottom=0.12)
 
 
     if cat_palette:
@@ -155,7 +243,7 @@ def detailed_forest_plot(
         dfrow = dfrow_pred.iloc[0]
         style = dict(fontsize=FONT_SIZE, fontweight='normal')
 
-        is_null = pd.isna(dfrow.get("OR")) or pd.isna(dfrow.get("CI_low")) or pd.isna(dfrow.get("CI_high"))
+        is_null = pd.isna(dfrow.get("effect")) or pd.isna(dfrow.get("ci_low")) or pd.isna(dfrow.get("ci_high"))
         text_color = "#A0A0A0" if is_null else "black"
 
         ax_text.text(BLOCK_X["predictor"], y, pred, ha='left', va='center', color=text_color, **style)
@@ -179,9 +267,8 @@ def detailed_forest_plot(
             if dfrow.empty:
                 continue
             dfrow = dfrow.iloc[0]
-            eff, lo, hi, p = dfrow.get("OR", np.nan), dfrow.get("CI_low", np.nan), dfrow.get("CI_high", np.nan), dfrow.get("p_value", np.nan)
+            eff, lo, hi, p = dfrow.get("effect", np.nan), dfrow.get("ci_low", np.nan), dfrow.get("ci_high", np.nan), dfrow.get("p_value", np.nan)
             effect_val, ci, pval, _ = format_effect_ci_p(eff, lo, hi, p)
-            eff_bold = is_effect_bold(eff)
             p_bold = pd.notnull(p) and p < 0.05
             manual_pred = bold_override.get(pred, {})
             manual_outcome = manual_pred.get(outcome, None)
@@ -224,7 +311,7 @@ def detailed_forest_plot(
                 if dfrow.empty:
                     continue
                 dfrow = dfrow.iloc[0]
-                eff, lo, hi = dfrow.get("OR", np.nan), dfrow.get("CI_low", np.nan), dfrow.get("CI_high", np.nan)
+                eff, lo, hi = dfrow.get("effect", np.nan), dfrow.get("ci_low", np.nan), dfrow.get("ci_high", np.nan)
                 is_null = pd.isna(eff) or pd.isna(lo) or pd.isna(hi)
                 color = "#C7C7C7" if is_null else colors[j]
 
