@@ -140,8 +140,8 @@ def build_cases() -> list[Case]:
         Case("D5", "gamma span==0 after exp", "gamma_zero", dict(model_type="gamma")),
         Case("D6", "binom wide range", "binom_wide", dict(model_type="binom", exponentiate=False)),
         # E
-        Case("E1", "font size small", "linear", dict(model_type="linear", font_size=10)),
-        Case("E2", "font size large", "linear", dict(model_type="linear", font_size=20)),
+        Case("E1", "layout baseline A", "linear", dict(model_type="linear")),
+        Case("E2", "layout baseline B", "linear", dict(model_type="linear", show_general_stats=False)),
         Case("E3", "base_decimals 0", "gamma", dict(model_type="gamma", base_decimals=0)),
         Case("E4", "base_decimals 4", "gamma", dict(model_type="gamma", base_decimals=4)),
         Case("E5", "power10 ticks", "binom", dict(model_type="binom", exponentiate=False, tick_style="power10")),

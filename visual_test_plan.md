@@ -89,8 +89,8 @@ reference line always visible, extreme points don't clip.
 
 | ID | Base dataset | Parameter under test | Call snippet | Verify |
 |:---|:-------------|:---------------------|:-------------|:-------|
-| E1 | linear | `font_size=10` | `font_size=10` | All text smaller, no overlap, still readable |
-| E2 | linear | `font_size=20` | `font_size=20` | All text larger, may cause crowding — check for overlap |
+| E1 | linear | Layout preset (True, True) | (default, two outcomes) | Matches case 1 gamma reference |
+| E2 | linear | Layout preset (True, False) | `show_general_stats=True`, one outcome | Matches case 2 gamma reference |
 | E3 | gamma | `base_decimals=0` | `base_decimals=0` | Effect/CI values show integers only (e.g., "1" not "1.02") |
 | E4 | gamma | `base_decimals=4` | `base_decimals=4` | Effect/CI values show 4 decimal places |
 | E5 | binom | `tick_style="power10"` | `tick_style="power10", exponentiate=False` | Axis labels show 10^x notation, no crash, readable |
@@ -100,17 +100,20 @@ reference line always visible, extreme points don't clip.
 
 ---
 
-### F. Layout and structural parameters (7 tests)
+### F. Layout and structural parameters (10 tests)
 
 | ID | Base dataset | Parameter under test | Call snippet | Verify |
 |:---|:-------------|:---------------------|:-------------|:-------|
 | F1 | linear | `table_only=True` | `table_only=True` | No forest panel at all, only text table, no crash |
 | F2 | linear | `show_general_stats=False` | `show_general_stats=False` | n/N/Freq columns hidden, outcome columns shift left |
-| F3 | linear | `show_general_stats=True` | (default) | n/N/Freq headers visible (empty values since data lacks n/N) |
-| F4 | binom | `footer_text="Adjusted for age and sex"` | `footer_text="..."` | Italic gray text below plot frame |
-| F5 | linear | `block_spacing=3.0` | `block_spacing=3.0` | Columns tighter together — check for overlap |
-| F6 | linear | `block_spacing=10.0` | `block_spacing=10.0` | Columns spread wide — check for truncation |
-| F7 | binom | `bold_override={"predictor2": {"outcome1": True}}` | `bold_override={...}, exponentiate=False` | predictor2/outcome1 effect value forced bold regardless of p |
+| F3 | linear | `show_general_stats=True` | (default) + modified dataset with n/N | n/N/Freq headers visible, values populated, headers centered over values |
+| F4 | binom | Short footer | `footer_text="Adjusted for age and sex"` | Italic gray text below plot frame, fully visible, not clipped |
+| F5 | binom | Long footer | `footer_text="Adjusted for age, sex, BMI, smoking status, diabetes, hypertension, and prior cardiovascular events. Sensitivity analyses excluded patients with missing lab values (n=47)."` | Text wraps or truncates gracefully, no collision with frame |
+| F6 | binom | Footer with special chars | `footer_text="†p<0.05 after Bonferroni correction; ‡excluding n=12 protocol deviations"` | Special characters render correctly |
+| F7 | linear | `block_spacing=3.0` | `block_spacing=3.0` | Columns tighter together — check for overlap |
+| F8 | linear | `block_spacing=10.0` | `block_spacing=10.0` | Columns spread wide — check for truncation |
+| F9 | binom | `bold_override={"predictor2": {"outcome1": True}}` | `bold_override={...}, exponentiate=False` | predictor2/outcome1 effect value forced bold regardless of p |
+| F10 | binom | `clip_outliers=True` on wide data | D6 dataset + `clip_outliers=True, exponentiate=False` | Arrow markers (< >) at clipped CI edges, axis range tighter than D6 |
 
 ---
 
@@ -159,7 +162,7 @@ df_gamma_zero["Estimate"] = 0.0
 df_gamma_zero["CI_low"] = -0.01
 df_gamma_zero["CI_high"] = 0.01
 
-# --- G6: Binom wide log range (for D6) ---
+# --- G6: Binom wide log range (for D6 and F10) ---
 df_binom_wide = df_binom.copy()
 mask1 = (df_binom_wide["predictor"] == "predictor1") & (df_binom_wide["outcome"] == "outcome1")
 mask2 = (df_binom_wide["predictor"] == "predictor2") & (df_binom_wide["outcome"] == "outcome1")
@@ -249,6 +252,6 @@ def run_test(test_id, df, description, **kwargs):
 3. **A1–A4** (baseline correctness) — foundational sanity
 4. **C1–C4** (outcomes) — layout correctness
 5. **E1–E8** (formatting) — visual polish
-6. **F1–F7** (layout params) — structural edge cases
+6. **F1–F10** (layout params) — structural edge cases including footer and clip_outliers
 7. **H1–H3** (save/show) — output pipeline
 8. **I1–I4** (error paths) — defensive behavior

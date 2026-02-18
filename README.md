@@ -11,6 +11,7 @@ Publication-ready forest plots for regression model outputs in Python.
 - **Flexible column detection** — accepts `OR`, `Ratio`, `Estimate`, `beta`, `Coef`, or `effect` as input
 - **Dual-outcome layout** — side-by-side comparison of up to two outcomes
 - **Category grouping** — optional row grouping with bold category headers
+- **Deterministic layout presets** — fixed internal geometry for 4 core display cases
 - **Static matplotlib output** — high-resolution, saveable figures
 
 ## Installation
@@ -98,7 +99,6 @@ fig, axes = fpx.forest_plot(
     footer_text=None,                # Italic footer below the plot
     show_general_stats=True,         # Show n / N / Freq columns
     bold_override=None,              # Manual bold control per predictor/outcome
-    font_size=14,                    # Base font size
     block_spacing=6.0,               # Horizontal spacing between table blocks
     base_decimals=2,                 # Decimal places for effect / CI values
     tick_style="decimal",            # "decimal" or "power10" (readable log10 exponents)
@@ -111,6 +111,24 @@ fig, axes = fpx.forest_plot(
 
 **Returns:** `(fig, axes)` — matplotlib Figure and axes tuple. When `show=False`, the figure is returned without displaying, allowing further customization before calling `plt.show()` manually.
 When `exponentiate=None`, auto exponentiation for log/logit links emits a warning so users can verify input scale.
+
+### Layout Behavior (v1)
+
+`forest_plot()` uses fixed internal layout presets (including internal font size) for:
+
+1. `show_general_stats=True` + two outcomes
+2. `show_general_stats=True` + one outcome
+3. `show_general_stats=False` + two outcomes
+4. `show_general_stats=False` + one outcome
+
+This is intentional to keep output stable and publication-ready across common use cases.
+
+### Exponentiation Safety
+
+- Use `exponentiate=None` (default) for model/link-based automatic handling.
+- Use `exponentiate=False` if your input is already on effect scale (e.g., OR/Ratio, not log-coefficients).
+- Use `exponentiate=True` only when input is definitely on log scale and needs transformation.
+- Read warnings: they are emitted to prevent silent double exponentiation mistakes.
 
 ### `normalize_model_output()`
 
@@ -194,7 +212,7 @@ pytest
 | `tests/test_normalization.py` | `_normalize.py` | 8 |
 | `tests/test_layout.py` | `_layout.py` | 33 |
 | `tests/test_axes_config.py` | `_axes_config.py` | 64 |
-| `tests/test_plot_smoke.py` | `plot.py` | 1 |
+| `tests/test_plot_smoke.py` | `plot.py` | 2 |
 
 ### Coverage summary
 

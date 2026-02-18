@@ -20,7 +20,6 @@ def forest_plot(
     legend_labels=None,
     point_colors: list[str] | None = None,
     footer_text=None,
-    font_size: int = 14,
     block_spacing: float = 6.0,
     tick_style: str = "decimal",
     clip_outliers: bool = False,
