@@ -81,7 +81,7 @@ The `link` parameter can override the default — for example, `model_type="bino
 | `n` | Event count |
 | `N` | Total count |
 
-**Note:** For `logit` and `log` link functions, provide effects on the log scale — `forestplotx` exponentiates automatically.
+**Note:** For `logit`/`log` links, `exponentiate=None` applies model-based exponentiation with a warning; set `exponentiate=False` if your data is already on effect scale.
 
 ## API Reference
 
@@ -92,6 +92,7 @@ fig, axes = fpx.forest_plot(
     df,                              # DataFrame with model output
     model_type="binom",              # "binom" | "gamma" | "linear" | "ordinal"
     link=None,                       # Override default link function
+    exponentiate=None,               # None=auto by link, True=force, False=disable
     outcomes=None,                   # list[str], max 2; auto-detected if None
     legend_labels=None,              # list[str] override for legend entries
     footer_text=None,                # Italic footer below the plot
@@ -100,7 +101,7 @@ fig, axes = fpx.forest_plot(
     font_size=14,                    # Base font size
     block_spacing=6.0,               # Horizontal spacing between table blocks
     base_decimals=2,                 # Decimal places for effect / CI values
-    tick_style="decimal",            # "decimal" or "power10" for log-axis labels
+    tick_style="decimal",            # "decimal" or "power10" (readable log10 exponents)
     point_colors=None,               # list[str], up to 2 hex codes for outcome markers
     table_only=False,                # Render table without forest panel
     show=True,                       # Call plt.show(); set False for programmatic use
@@ -109,14 +110,18 @@ fig, axes = fpx.forest_plot(
 ```
 
 **Returns:** `(fig, axes)` — matplotlib Figure and axes tuple. When `show=False`, the figure is returned without displaying, allowing further customization before calling `plt.show()` manually.
+When `exponentiate=None`, auto exponentiation for log/logit links emits a warning so users can verify input scale.
 
 ### `normalize_model_output()`
 
 ```python
-clean_df, config = fpx.normalize_model_output(df, model_type="binom", link=None)
+clean_df, config = fpx.normalize_model_output(
+    df, model_type="binom", link=None, exponentiate=None
+)
 ```
 
-Standardizes column names, applies exponentiation, and returns a config dict with axis metadata. Useful if you want the normalized data without plotting.
+Standardizes columns, applies exponentiation policy, and returns axis metadata.
+`config` includes `exponentiated` and `renamed_columns` for transparency.
 
 ## Examples
 
@@ -213,7 +218,7 @@ pytest
 - End-to-end parametrized across all four model types: binom, gamma, linear, ordinal
 - `show_general_stats=True/False` both produce consistent output (documents no-op behaviour on axis)
 - Tick count heuristic: `num_ticks` in {3, 5, 7} for log and linear axes
-- `tick_style="power10"` does not crash; single vs dual outcome `lo_all`/`hi_all` arrays both handled
+- `tick_style="power10"` uses readable rounded log10 exponents; single vs dual outcome `lo_all`/`hi_all` arrays both handled
 
 ## Scope
 

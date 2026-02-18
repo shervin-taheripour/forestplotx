@@ -578,6 +578,22 @@ def test_tick_style_power10_does_not_crash(ax):
     assert len(ax.get_xticks()) >= 2
 
 
+def test_tick_style_power10_uses_readable_exponents(ax):
+    configure_forest_axis(
+        ax=ax,
+        model_type="binom",
+        link="logit",
+        thresholds=thresholds_for("logit", lo=[0.3], hi=[6.0], tick_style="power10"),
+        num_ticks=5,
+        font_size=12,
+        show_general_stats=True,
+    )
+    labels = [t.get_text() for t in ax.get_xticklabels() if t.get_text()]
+    assert labels
+    # Exponents may be fractional, but should be rounded/readable (<= 2 decimals).
+    assert all(len(lbl.split(".")[-1].rstrip("}$")) <= 2 if "." in lbl else True for lbl in labels)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Single vs dual outcome: lo_all / hi_all array sizes
 # ═══════════════════════════════════════════════════════════════════════════════

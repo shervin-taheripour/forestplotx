@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 DEFAULT_LINK = {
     "binom": "logit",
@@ -8,7 +9,7 @@ DEFAULT_LINK = {
 }
 
 
-def _normalize_model_output(df, model_type, link=None):
+def _normalize_model_output(df, model_type, link=None, exponentiate=None):
     """
     Normalize model output to standardized columns and apply
     link-driven transformations.
@@ -29,13 +30,20 @@ def _normalize_model_output(df, model_type, link=None):
     if resolved_link in ("log", "logit"):
         reference_line = 1.0
         use_log = True
-        exponentiate = True
+        default_exponentiate = True
     elif resolved_link == "identity":
         reference_line = 0.0
         use_log = False
-        exponentiate = False
+        default_exponentiate = False
     else:
         raise ValueError(f"Unsupported link '{resolved_link}'")
+
+    if exponentiate is None:
+        should_exponentiate = default_exponentiate
+    elif isinstance(exponentiate, bool):
+        should_exponentiate = exponentiate
+    else:
+        raise TypeError("exponentiate must be bool or None.")
 
     df = df.copy()
 
@@ -72,7 +80,7 @@ def _normalize_model_output(df, model_type, link=None):
         df = df[~mask]
 
     # ---- Apply exponentiation based on link --------------------------------
-    if exponentiate:
+    if should_exponentiate:
         for col in ("effect", "ci_low", "ci_high"):
             if col in df.columns:
                 df[col] = np.exp(df[col])
@@ -91,6 +99,21 @@ def _normalize_model_output(df, model_type, link=None):
             "log": "Ratio",
             "identity": "Coef",
         }[resolved_link],
+        "exponentiated": should_exponentiate,
+        "renamed_columns": rename.copy(),
     }
+
+    if exponentiate is None and should_exponentiate:
+        warnings.warn(
+            (
+                f"Exponentiation applied automatically (model_type='{model_type}', "
+                f"link='{resolved_link}', effect_label='{config['effect_label']}'). "
+                "If your input data is already on the effect scale, set "
+                "exponentiate=False to prevent double transformation. "
+                f"Column mapping: {config['renamed_columns']}"
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
 
     return df, config

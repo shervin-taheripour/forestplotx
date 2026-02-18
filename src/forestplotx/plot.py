@@ -15,6 +15,7 @@ def forest_plot(
     save=None,
     model_type="binom",
     link=None,
+    exponentiate: bool | None = None,
     table_only=False,
     legend_labels=None,
     point_colors: list[str] | None = None,
@@ -64,6 +65,7 @@ def forest_plot(
         df_final,
         model_type=model_type,
         link=link,
+        exponentiate=exponentiate,
     )
     effect_label = plot_config["effect_label"]
     ref_val = plot_config["reference_line"]

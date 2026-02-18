@@ -3,6 +3,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+import pytest
 
 from forestplotx import forest_plot
 
@@ -19,12 +20,13 @@ def test_forest_plot_smoke_returns_figure_and_axes():
         }
     )
 
-    fig, axes = forest_plot(
-        df_final=df,
-        outcomes=["y1", "y2"],
-        model_type="binom",
-        show=False,
-    )
+    with pytest.warns(UserWarning):
+        fig, axes = forest_plot(
+            df_final=df,
+            outcomes=["y1", "y2"],
+            model_type="binom",
+            show=False,
+        )
 
     ax_text, ax_forest = axes
     assert fig is not None

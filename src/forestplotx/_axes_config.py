@@ -42,6 +42,15 @@ def _decimals_from_ticks(ticks: np.ndarray, max_decimals: int = 3) -> int:
     return max(0, min(max_decimals, decimals))
 
 
+def _nice_log_step(raw_step: float) -> float:
+    """Return a readable log10 step size."""
+    candidates = [0.05, 0.1, 0.2, 0.25, 0.5, 1.0]
+    for cand in candidates:
+        if cand >= raw_step:
+            return cand
+    return raw_step
+
+
 def configure_forest_axis(
     ax: Axes,
     model_type: str,
@@ -128,22 +137,16 @@ def configure_forest_axis(
             target_ticks = max(int(num_ticks), 3)
             if target_ticks % 2 == 0:
                 target_ticks -= 1
-            n_side = max((target_ticks - 1) // 2, 1)
+            n_side_target = max((target_ticks - 1) // 2, 1)
 
-            span_ratio = max(pmax / ref_val, ref_val / pmin)
-            ratio_candidates = [1.05, 1.1, 1.2, 1.25, 1.5, 2.0]
-            ratio = None
-            for cand in ratio_candidates:
-                if cand**n_side >= span_ratio:
-                    ratio = cand
-                    break
-            if ratio is None:
-                ratio = span_ratio ** (1 / n_side)
-
-            powers = np.arange(-n_side, n_side + 1, dtype=float)
-            ticks = ref_val * np.power(ratio, powers)
-
-            axis_ratio = max(span_ratio * 1.05, ratio**n_side)
+            span_decades = max(abs(math.log10(pmin / ref_val)), abs(math.log10(pmax / ref_val)))
+            axis_span_decades = max(span_decades * 1.05, 0.02)
+            raw_step = axis_span_decades / n_side_target
+            step_decades = _nice_log_step(raw_step)
+            n_side = max(1, int(axis_span_decades / step_decades))
+            exponents = np.arange(-n_side, n_side + 1, dtype=float) * step_decades
+            ticks = ref_val * np.power(10.0, exponents)
+            axis_ratio = 10 ** axis_span_decades
             ax.set_xlim(ref_val / axis_ratio, ref_val * axis_ratio)
             ax.xaxis.set_major_locator(FixedLocator(ticks))
 
@@ -152,13 +155,16 @@ def configure_forest_axis(
                 def _power10_formatter(x: float, _pos: int) -> str:
                     exp = math.log10(x / ref_val)
                     rounded = round(exp, 2)
+                    if math.isclose(rounded, 0.0, abs_tol=1e-9):
+                        rounded = 0.0
+                    exp_txt = f"{rounded:.2f}".rstrip("0").rstrip(".")
                     if math.isclose(ref_val, 1.0):
-                        return rf"$10^{{{rounded:g}}}$"
-                    return rf"${_format_decimal(ref_val)}\times10^{{{rounded:g}}}$"
+                        return rf"$10^{{{exp_txt}}}$"
+                    return rf"${_format_decimal(ref_val)}\times10^{{{exp_txt}}}$"
 
                 ax.xaxis.set_major_formatter(FuncFormatter(_power10_formatter))
             else:
-                decimals = _decimals_from_ticks(ticks)
+                decimals = max(2, _decimals_from_ticks(ticks))
                 ax.xaxis.set_major_formatter(
                     FuncFormatter(lambda x, _pos, d=decimals: f"{x:.{d}f}")
                 )

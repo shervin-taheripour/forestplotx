@@ -39,7 +39,8 @@ def test_linear_no_exponentiation():
 
 def test_binom_exponentiation():
     df = make_base_df("Estimate", 0.0)  # exp(0) = 1
-    clean_df, config = _normalize_model_output(df, "binom")
+    with pytest.warns(UserWarning):
+        clean_df, config = _normalize_model_output(df, "binom")
 
     assert np.isclose(clean_df["effect"].iloc[0], 1.0)
     assert config["reference_line"] == 1.0
@@ -52,7 +53,8 @@ def test_binom_exponentiation():
 
 def test_gamma_exponentiation():
     df = make_base_df("Estimate", 0.0)
-    clean_df, _ = _normalize_model_output(df, "gamma")
+    with pytest.warns(UserWarning):
+        clean_df, _ = _normalize_model_output(df, "gamma")
 
     assert np.isclose(clean_df["effect"].iloc[0], 1.0)
 
@@ -71,7 +73,8 @@ def test_ordinal_drops_threshold_rows():
         "outcome": ["y1", "y1"]
     })
 
-    clean_df, _ = _normalize_model_output(df, "ordinal")
+    with pytest.warns(UserWarning):
+        clean_df, _ = _normalize_model_output(df, "ordinal")
 
     assert len(clean_df) == 1
     assert clean_df["predictor"].iloc[0] == "x1"
@@ -83,11 +86,40 @@ def test_ordinal_drops_threshold_rows():
 
 def test_log_link_exponentiates():
     df = make_base_df("Estimate", 0.0)
-    clean_df, config = _normalize_model_output(df, "gamma", link="log")
+    with pytest.warns(UserWarning):
+        clean_df, config = _normalize_model_output(df, "gamma", link="log")
 
     assert clean_df["effect"].iloc[0] == 1.0
     assert config["reference_line"] == 1.0
     assert config["use_log"] is True
+
+
+def test_explicit_exponentiate_false_overrides_default():
+    df = make_base_df("Estimate", 0.5)
+    clean_df, config = _normalize_model_output(df, "binom", exponentiate=False)
+
+    assert np.isclose(clean_df["effect"].iloc[0], 0.5)
+    assert config["exponentiated"] is False
+
+
+def test_explicit_exponentiate_true_forces_exponentiation():
+    df = make_base_df("Estimate", 0.0)
+    clean_df, config = _normalize_model_output(df, "linear", exponentiate=True)
+
+    assert np.isclose(clean_df["effect"].iloc[0], 1.0)
+    assert config["exponentiated"] is True
+
+
+def test_config_contains_renamed_columns_map():
+    df = make_base_df("Estimate", 0.5)
+    clean_df, config = _normalize_model_output(df, "linear", exponentiate=False)
+
+    assert "effect" in clean_df.columns
+    assert config["renamed_columns"] == {
+        "Estimate": "effect",
+        "CI_low": "ci_low",
+        "CI_high": "ci_high",
+    }
 
 def test_identity_link_no_exponentiation():
     df = make_base_df("Estimate", 0.5)
