@@ -10,7 +10,7 @@ Publication-ready forest plots for regression model outputs in Python.
 - **Automatic effect-scale handling** — exponentiation, log-scale axes, and reference lines driven by link function
 - **Flexible column detection** — accepts `OR`, `Ratio`, `Estimate`, `beta`, `Coef`, or `effect` as input
 - **Dual-outcome layout** — side-by-side comparison of up to two outcomes
-- **Category grouping** — optional row grouping with shaded bands
+- **Category grouping** — optional row grouping with bold category headers
 - **Static matplotlib output** — high-resolution, saveable figures
 
 ## Installation
@@ -84,7 +84,6 @@ fig, axes = fpx.forest_plot(
     model_type="binom",              # "binom" | "gamma" | "linear" | "ordinal"
     link=None,                       # Override default link function
     outcomes=None,                   # list[str], max 2; auto-detected if None
-    palette=None,                    # dict mapping category → hex color
     legend_labels=None,              # list[str] override for legend entries
     footer_text=None,                # Italic footer below the plot
     show_general_stats=True,         # Show n / N / Freq columns
@@ -92,12 +91,15 @@ fig, axes = fpx.forest_plot(
     font_size=14,                    # Base font size
     block_spacing=6.0,               # Horizontal spacing between table blocks
     base_decimals=2,                 # Decimal places for effect / CI values
+    tick_style="decimal",            # "decimal" or "power10" for log-axis labels
+    point_colors=None,               # list[str], up to 2 hex codes for outcome markers
     table_only=False,                # Render table without forest panel
+    show=True,                       # Call plt.show(); set False for programmatic use
     save=None,                       # File path to save (e.g. "plot.png")
 )
 ```
 
-**Returns:** `(fig, axes)` — matplotlib Figure and axes tuple for further customization.
+**Returns:** `(fig, axes)` — matplotlib Figure and axes tuple. When `show=False`, the figure is returned without displaying, allowing further customization before calling `plt.show()` manually.
 
 ### `normalize_model_output()`
 
@@ -114,11 +116,7 @@ Standardizes column names, applies exponentiation, and returns a config dict wit
 ```python
 df["category"] = ["Demographics", "Demographics", "Clinical", "Clinical"]
 
-fig, axes = fpx.forest_plot(
-    df,
-    model_type="binom",
-    palette={"Demographics": "#E8F0FE", "Clinical": "#FEF3E8"},
-)
+fig, axes = fpx.forest_plot(df, model_type="binom")
 ```
 
 ### Dual outcomes
@@ -133,6 +131,17 @@ fig, axes = fpx.forest_plot(
 )
 ```
 
+### Custom marker colors
+
+```python
+fig, axes = fpx.forest_plot(
+    df_two_outcomes,
+    model_type="binom",
+    outcomes=["Mortality", "Readmission"],
+    point_colors=["#2C5F8A", "#D4763A"],
+)
+```
+
 ### Linear model
 
 ```python
@@ -143,6 +152,15 @@ fig, axes = fpx.forest_plot(df_linear, model_type="linear")
 
 ```python
 fig, axes = fpx.forest_plot(df, model_type="binom", save="forest_plot.png")
+```
+
+### Programmatic use (no display)
+
+```python
+fig, axes = fpx.forest_plot(df, model_type="binom", show=False)
+# Further customization...
+fig.suptitle("My Forest Plot", fontsize=16)
+fig.savefig("custom_plot.pdf", dpi=300)
 ```
 
 ## Testing

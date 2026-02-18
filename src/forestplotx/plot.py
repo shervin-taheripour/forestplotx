@@ -11,18 +11,19 @@ from ._normalize import _normalize_model_output
 
 def forest_plot(
     df_final,
-    palette=None,
     outcomes=None,
     save=None,
     model_type="binom",
     link=None,
     table_only=False,
     legend_labels=None,
+    point_colors: list[str] | None = None,
     footer_text=None,
     font_size: int = 14,
     block_spacing: float = 6.0,
     tick_style: str = "decimal",
     base_decimals=2,
+    show: bool = True,
     show_general_stats: bool = True,
     bold_override: dict | None = None,
 ):
@@ -83,8 +84,6 @@ def forest_plot(
     table_rows = layout["rows"].to_dict("records")
     y_positions = layout["y_positions"]
     n = layout["meta"]["n"]
-    row_is_cat = layout["meta"]["row_is_cat"]
-    row_cats = layout["meta"]["row_cats"]
 
     if table_only:
         fig, ax_text = plt.subplots(1, 1, figsize=(15, 0.3 * n + 1.5))
@@ -98,12 +97,6 @@ def forest_plot(
         )
         plt.subplots_adjust(wspace=0.02)
         plt.subplots_adjust(bottom=0.12)
-
-    if palette:
-        for y, cat, is_cat in zip(y_positions, row_cats, row_is_cat):
-            color = palette.get(cat, "#f5f5f5")
-            for ax in [ax_text, ax_forest] if ax_forest else [ax_text]:
-                ax.axhspan(y - 0.5, y + 0.5, color=color, alpha=0.13, zorder=-2)
 
     header_row_1, header_row_2 = -2.2, -1.0
     ax_text.text(
@@ -272,8 +265,11 @@ def forest_plot(
     ax_text.set_ylim(n - 0.5, -2.8)
     ax_text.axis("off")
 
+    _DEFAULT_COLORS = ["#212427", "#D8CBBB"]
+    colors = (point_colors or _DEFAULT_COLORS)[:2]
+
     if ax_forest is not None:
-        colors, markers = ["#212427", "#D8CBBB"], ["o", "s"]
+        markers = ["o", "s"]
         handles, labels, Y_OFFSET = [], [], 0.10
         eff_all, lo_all, hi_all = [], [], []
         for j, outcome in enumerate(outcomes):
@@ -381,7 +377,7 @@ def forest_plot(
     if save_path is not None:
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
-    plt.show()
+    if show:
+        plt.show()
 
-    if save_path is not None:
-        plt.close(fig)
+    return fig, (ax_text, ax_forest)
