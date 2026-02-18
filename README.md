@@ -145,6 +145,46 @@ fig, axes = fpx.forest_plot(df_linear, model_type="linear")
 fig, axes = fpx.forest_plot(df, model_type="binom", save="forest_plot.png")
 ```
 
+## Testing
+
+The test suite lives in `tests/` and covers all internal modules with no image comparisons — structural and behavioral assertions only.
+
+```bash
+pytest
+```
+
+### Test files
+
+| File | Module under test | Tests |
+|:-----|:------------------|------:|
+| `tests/test_normalization.py` | `_normalize.py` | 7 |
+| `tests/test_layout.py` | `_layout.py` | 34 |
+| `tests/test_axes_config.py` | `_axes_config.py` | 63 |
+
+### Coverage summary
+
+**`test_layout.py`** — `build_row_layout()`
+
+- Flat layout (no `category` column): sequential y-positions, correct row count, all `is_cat=False`, `"Uncategorized"` labels, predictor order preserved, required columns present
+- NaN predictor rows dropped; empty DataFrame raises `ValueError`
+- Categorized layout: category header rows inserted, total = categories + predictors (parametrized), correct `is_cat` flags and per-predictor category labels, all-NaN category falls back to flat
+- Dual-outcome DataFrames: `unique()` deduplication keeps one row per predictor regardless of outcome count
+
+**`test_axes_config.py`** — `configure_forest_axis()` and helpers
+
+- `_nice_linear_step`: 8 parametrized input→output pairs, zero, negative, tiny positive values
+- `_decimals_from_ticks`: empty/single-tick → 2, step-inferred decimals (0/1/2), `max_decimals` cap
+- Reference line: `axvline` placed at correct x for logit (1.0), log (1.0), identity (0.0); `#910C07` color; dashed style; threshold override
+- X-scale: `"log"` for logit/log links, `"linear"` for identity; empty data and `thresholds=None` do not crash
+- X-label: correct label per link (`"Odds Ratio"` / `"Ratio"` / `"Effect Size"`), threshold override, font size propagated
+- Y-ticks cleared; y-limits applied from `thresholds["y_limits"]`
+- Spine visibility: top/right/left hidden, bottom visible
+- X-limits contain full data range for log and linear axes; negative reference raises `ValueError`; span=0 edge case handled
+- End-to-end parametrized across all four model types: binom, gamma, linear, ordinal
+- `show_general_stats=True/False` both produce consistent output (documents no-op behaviour on axis)
+- Tick count heuristic: `num_ticks` in {3, 5, 7} for log and linear axes
+- `tick_style="power10"` does not crash; single vs dual outcome `lo_all`/`hi_all` arrays both handled
+
 ## Scope
 
 `forestplotx` v1.0 is intentionally focused. It produces static, publication-quality forest plots for common regression model types.

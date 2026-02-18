@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from forestplotx.plot_utils import _normalize_model_output
+from forestplotx._normalize import _normalize_model_output
 
 
 # -----------------------------------------------------------
@@ -47,12 +47,12 @@ def test_binom_exponentiation():
 
 
 # -----------------------------------------------------------
-# Exp model: exponentiation applied
+# Gamma model: exponentiation applied
 # -----------------------------------------------------------
 
-def test_exp_exponentiation():
+def test_gamma_exponentiation():
     df = make_base_df("Estimate", 0.0)
-    clean_df, _ = _normalize_model_output(df, "exp")
+    clean_df, _ = _normalize_model_output(df, "gamma")
 
     assert np.isclose(clean_df["effect"].iloc[0], 1.0)
 
