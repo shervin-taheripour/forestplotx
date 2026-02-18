@@ -1,3 +1,16 @@
+Metadata-Version: 2.4
+Name: forestplotx
+Version: 1.0.0
+Summary: Publication-ready forest plots for regression model outputs in Python.
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: matplotlib>=3.7
+Requires-Dist: numpy>=1.24
+Requires-Dist: pandas>=2.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+
 # forestplotx
 
 Publication-ready forest plots for regression model outputs in Python.
@@ -19,16 +32,13 @@ Publication-ready forest plots for regression model outputs in Python.
 pip install forestplotx
 ```
 
-Requires Python ≥ 3.10. Dependencies: `matplotlib>=3.7`, `numpy>=1.24`, `pandas>=2.0`.
-
-### Development install (reproducible environment)
+For development (includes `pytest`):
 
 ```bash
-pip install -r requirements.txt   # pin exact versions used during development
-pip install -e ".[dev]"           # install forestplotx itself in editable mode
+pip install -e ".[dev]"
 ```
 
-`requirements.txt` pins the full transitive closure of runtime + test dependencies. `pyproject.toml` declares the minimum-version constraints used when installing normally.
+Requires Python ≥ 3.10. Dependencies: `matplotlib>=3.7`, `numpy>=1.24`, `pandas>=2.0`.
 
 ## Quick Start
 
@@ -40,7 +50,7 @@ import forestplotx as fpx
 df = pd.DataFrame({
     "predictor": ["Age", "Sex", "BMI", "Smoking"],
     "outcome":   ["Mortality"] * 4,
-    "Estimate":  [-0.12, 0.85, 0.30, 0.55],   # log-odds (pre-exponentiation)
+    "OR":        [-0.12, 0.85, 0.30, 0.55],   # log-odds (pre-exponentiation)
     "CI_low":    [-0.35, 0.42, 0.05, 0.20],
     "CI_high":   [ 0.11, 1.28, 0.55, 0.90],
     "p_value":   [0.300, 0.001, 0.020, 0.003],
@@ -186,10 +196,9 @@ pytest
 
 | File | Module under test | Tests |
 |:-----|:------------------|------:|
-| `tests/test_normalization.py` | `_normalize.py` | 8 |
-| `tests/test_layout.py` | `_layout.py` | 33 |
-| `tests/test_axes_config.py` | `_axes_config.py` | 64 |
-| `tests/test_plot_smoke.py` | `plot.py` | 1 |
+| `tests/test_normalization.py` | `_normalize.py` | 7 |
+| `tests/test_layout.py` | `_layout.py` | 34 |
+| `tests/test_axes_config.py` | `_axes_config.py` | 63 |
 
 ### Coverage summary
 

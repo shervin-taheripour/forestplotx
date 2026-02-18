@@ -76,7 +76,7 @@ def forest_plot(
         eff_s = f"{eff:.{d}f}" if pd.notnull(eff) else ""
         lo_s = f"{lo:.{d}f}" if pd.notnull(lo) else ""
         hi_s = f"{hi:.{d}f}" if pd.notnull(hi) else ""
-        ci_s = f"{lo_s}–{hi_s}" if lo_s and hi_s else ""
+        ci_s = f"{lo_s}\u2013{hi_s}" if lo_s and hi_s else ""
         p_s = "" if pd.isnull(p) else ("<0.001" if p < 0.001 else f"{p:.3f}")
         return eff_s, ci_s, p_s, d
 
