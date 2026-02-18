@@ -100,6 +100,8 @@ def configure_forest_axis(
     use_log = bool(cfg.get("use_log", defaults["use_log"]))
     x_label = str(cfg.get("x_label", defaults["x_label"]))
     tick_style = str(cfg.get("tick_style", "decimal"))
+    clip_outliers = bool(cfg.get("clip_outliers", False))
+    clip_quantiles = cfg.get("clip_quantiles", (0.02, 0.98))
     lo_all = np.asarray(cfg.get("lo_all", []), dtype=float)
     hi_all = np.asarray(cfg.get("hi_all", []), dtype=float)
     y_limits = cfg.get("y_limits")
@@ -116,8 +118,17 @@ def configure_forest_axis(
         if not len(finite_lo) or not len(finite_hi):
             return ax
 
-        data_min = float(np.min(finite_lo))
-        data_max = float(np.max(finite_hi))
+        if clip_outliers:
+            q_low, q_high = clip_quantiles
+            q_low = float(q_low)
+            q_high = float(q_high)
+            if not (0.0 <= q_low < q_high <= 1.0):
+                raise ValueError("clip_quantiles must satisfy 0 <= low < high <= 1.")
+            data_min = float(np.quantile(finite_lo, q_low))
+            data_max = float(np.quantile(finite_hi, q_high))
+        else:
+            data_min = float(np.min(finite_lo))
+            data_max = float(np.max(finite_hi))
 
         ax.set_xscale("log" if use_log else "linear")
 
@@ -140,7 +151,8 @@ def configure_forest_axis(
             n_side_target = max((target_ticks - 1) // 2, 1)
 
             span_decades = max(abs(math.log10(pmin / ref_val)), abs(math.log10(pmax / ref_val)))
-            axis_span_decades = max(span_decades * 1.05, 0.02)
+            axis_span_decades = max(span_decades * 1.05, 0.06)
+            axis_span_decades = min(axis_span_decades, span_decades + 0.08)
             raw_step = axis_span_decades / n_side_target
             step_decades = _nice_log_step(raw_step)
             n_side = max(1, int(axis_span_decades / step_decades))
@@ -174,7 +186,7 @@ def configure_forest_axis(
         else:
             span = max(abs(data_min - ref_val), abs(data_max - ref_val))
             if span == 0:
-                span = max(1.0, abs(ref_val) * 0.2)
+                span = max(1e-3, abs(ref_val) * 0.1)
             target_ticks = max(int(num_ticks), 3)
             raw_step = (2 * span) / max(target_ticks - 1, 1)
             step = _nice_linear_step(raw_step)

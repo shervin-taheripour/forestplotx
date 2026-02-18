@@ -23,6 +23,8 @@ def forest_plot(
     font_size: int = 14,
     block_spacing: float = 6.0,
     tick_style: str = "decimal",
+    clip_outliers: bool = False,
+    clip_quantiles: tuple[float, float] = (0.02, 0.98),
     base_decimals=2,
     show: bool = True,
     show_general_stats: bool = True,
@@ -41,19 +43,6 @@ def forest_plot(
         raise TypeError("save must be a path string/path-like, None, or bool.")
 
     bold_override = bold_override or {}
-    BLOCK_X = {
-        "predictor": 0,
-        "general": block_spacing * 1.2,
-        "outcome1": block_spacing * 1.9,
-        "outcome2": block_spacing * 2.9,
-    }
-    if not show_general_stats:
-        BLOCK_X["outcome1"] = block_spacing * 1.2
-        BLOCK_X["outcome2"] = block_spacing * 2.2
-
-    GENERAL_OFFSETS = [0, 1.3, 2.6]
-    OUTCOME_OFFSETS = [0, 2.0, 4.1]
-
     if outcomes is None:
         outcomes = df_final["outcome"].unique().tolist()
     if len(outcomes) > 2:
@@ -87,6 +76,49 @@ def forest_plot(
     y_positions = layout["y_positions"]
     n = layout["meta"]["n"]
 
+    # 4-case layout presets:
+    # (show_general_stats, has_second_outcome) -> geometry config.
+    # For now, all four cases intentionally share the same values.
+    layout_presets = {
+        (True, True): {
+            "block_mult": {"general": 1.09, "outcome1": 1.74, "outcome2": 2.74},
+            "general_offsets": [0.0, 1.2, 2.7],
+            "outcome_offsets": [0.0, 2.0, 4.1],
+            "fig_width": 16,
+            "width_ratios": [1.9, 1.1],
+        },
+        (True, False): {
+            "block_mult": {"general": 1.2, "outcome1": 1.90, "outcome2": 2.9},
+            "general_offsets": [0.0, 1.3, 2.8],
+            "outcome_offsets": [0.0, 2.0, 4.1],
+            "fig_width": 13,
+            "width_ratios": [1.9, 1.3],
+        },
+        (False, True): {
+            "block_mult": {"general": 1.2, "outcome1": 1.30, "outcome2": 2.30},
+            "general_offsets": [0.0, 1.3, 2.6],
+            "outcome_offsets": [0.0, 2.1, 4.3],
+            "fig_width": 13,
+            "width_ratios": [1.9, 1.2],
+        },
+        (False, False): {
+            "block_mult": {"general": 1.2, "outcome1": 1.2, "outcome2": 2.9},
+            "general_offsets": [0.0, 1.3, 2.6],
+            "outcome_offsets": [0.0, 2.0, 4.1],
+            "fig_width": 9.5,
+            "width_ratios": [1.9, 1.2],
+        },
+    }
+    layout_cfg = layout_presets[(show_general_stats, has_second)]
+    render_font_size = 10
+    BLOCK_X = {"predictor": 0.0}
+    if show_general_stats:
+        BLOCK_X["general"] = block_spacing * layout_cfg["block_mult"]["general"]
+    BLOCK_X["outcome1"] = block_spacing * layout_cfg["block_mult"]["outcome1"]
+    BLOCK_X["outcome2"] = block_spacing * layout_cfg["block_mult"]["outcome2"]
+    GENERAL_OFFSETS = layout_cfg["general_offsets"]
+    OUTCOME_OFFSETS = layout_cfg["outcome_offsets"]
+
     if table_only:
         fig, ax_text = plt.subplots(1, 1, figsize=(15, 0.3 * n + 1.5))
         ax_forest = None
@@ -94,13 +126,15 @@ def forest_plot(
         fig, (ax_text, ax_forest) = plt.subplots(
             1,
             2,
-            figsize=(16, 0.3 * n + 1.5),
-            gridspec_kw={"width_ratios": [1.9, 1.1]},
+            figsize=(layout_cfg["fig_width"], 0.3 * n + 1.5),
+            gridspec_kw={"width_ratios": layout_cfg["width_ratios"]},
         )
         plt.subplots_adjust(wspace=0.02)
         plt.subplots_adjust(bottom=0.12)
 
     header_row_1, header_row_2 = -2.2, -1.0
+    general_header_artists = [None, None, None]
+    general_value_artists = [[], [], []]
     ax_text.text(
         BLOCK_X["predictor"],
         header_row_2,
@@ -108,18 +142,19 @@ def forest_plot(
         ha="left",
         va="center",
         fontweight="bold",
-        fontsize=font_size,
+        fontsize=render_font_size,
     )
     if show_general_stats:
         for i, label in enumerate(["n", "N", "Freq"]):
-            ax_text.text(
-                BLOCK_X["general"] + GENERAL_OFFSETS[i],
+            col_x = BLOCK_X["general"] + GENERAL_OFFSETS[i]
+            general_header_artists[i] = ax_text.text(
+                col_x,
                 header_row_2,
                 label,
                 ha="center",
                 va="center",
                 fontweight="bold",
-                fontsize=font_size,
+                fontsize=render_font_size,
             )
     ax_text.text(
         BLOCK_X["outcome1"] + OUTCOME_OFFSETS[1],
@@ -128,7 +163,7 @@ def forest_plot(
         ha="center",
         va="center",
         fontweight="bold",
-        fontsize=font_size,
+        fontsize=render_font_size,
     )
     for i, label in enumerate([effect_label, ci_label, "p"]):
         ax_text.text(
@@ -138,7 +173,7 @@ def forest_plot(
             ha="center",
             va="center",
             fontweight="bold",
-            fontsize=font_size,
+            fontsize=render_font_size,
         )
     if has_second:
         ax_text.text(
@@ -148,7 +183,7 @@ def forest_plot(
             ha="center",
             va="center",
             fontweight="bold",
-            fontsize=font_size,
+            fontsize=render_font_size,
         )
         for i, label in enumerate([effect_label, ci_label, "p"]):
             ax_text.text(
@@ -158,7 +193,7 @@ def forest_plot(
                 ha="center",
                 va="center",
                 fontweight="bold",
-                fontsize=font_size,
+                fontsize=render_font_size,
             )
 
     for y, row in zip(y_positions, table_rows):
@@ -170,7 +205,7 @@ def forest_plot(
                 pred,
                 ha="left",
                 va="center",
-                fontsize=font_size,
+                fontsize=render_font_size,
                 fontweight="bold",
             )
             continue
@@ -179,7 +214,7 @@ def forest_plot(
         if dfrow_pred.empty:
             continue
         dfrow = dfrow_pred.iloc[0]
-        style = dict(fontsize=font_size, fontweight="normal")
+        style = dict(fontsize=render_font_size, fontweight="normal")
 
         is_null = (
             pd.isna(dfrow.get("effect"))
@@ -208,15 +243,17 @@ def forest_plot(
                 except Exception:
                     pass
             for i, val in enumerate([n_val, N_val, freq_val]):
-                ax_text.text(
-                    BLOCK_X["general"] + GENERAL_OFFSETS[i],
+                col_x = BLOCK_X["general"] + GENERAL_OFFSETS[i]
+                txt = ax_text.text(
+                    col_x,
                     y,
                     val,
-                    ha="center",
+                    ha="right",
                     va="center",
-                    fontsize=font_size,
+                    fontsize=render_font_size,
                     color=text_color,
                 )
+                general_value_artists[i].append(txt)
 
         for k, outcome in enumerate(outcomes):
             out_block = "outcome1" if k == 0 else "outcome2"
@@ -253,7 +290,7 @@ def forest_plot(
                     val,
                     ha="center",
                     va="center",
-                    fontsize=font_size,
+                    fontsize=render_font_size,
                     fontweight="bold" if final_bold else "normal",
                     color=text_color,
                 )
@@ -265,10 +302,31 @@ def forest_plot(
     )
     ax_text.set_xlim(-0.5, rightmost)
     ax_text.set_ylim(n - 0.5, -2.8)
+
+    # Center n/N/Freq headers over the actual rendered value columns.
+    if show_general_stats:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        inv = ax_text.transData.inverted()
+        for i in range(3):
+            if general_header_artists[i] is None or not general_value_artists[i]:
+                continue
+            bboxes = [t.get_window_extent(renderer=renderer) for t in general_value_artists[i]]
+            left = min(b.x0 for b in bboxes)
+            right = max(b.x1 for b in bboxes)
+            center_disp_x = 0.5 * (left + right)
+            center_data_x = inv.transform((center_disp_x, 0.0))[0]
+            general_header_artists[i].set_x(center_data_x)
+
     ax_text.axis("off")
 
     _DEFAULT_COLORS = ["#212427", "#D8CBBB"]
-    colors = (point_colors or _DEFAULT_COLORS)[:2]
+    if point_colors:
+        colors = list(point_colors[:2])
+        if len(colors) < 2:
+            colors.extend(_DEFAULT_COLORS[len(colors) : 2])
+    else:
+        colors = _DEFAULT_COLORS.copy()
 
     if ax_forest is not None:
         markers = ["o", "s"]
@@ -346,12 +404,56 @@ def forest_plot(
                 "hi_all": hi_all,
                 "y_limits": (n - 0.5, -2.8),
                 "tick_style": tick_style,
+                "clip_outliers": clip_outliers,
+                "clip_quantiles": clip_quantiles,
             },
             num_ticks=6,
-            font_size=font_size,
+            font_size=render_font_size,
             show_general_stats=show_general_stats,
         )
-        ax_forest.legend(handles, labels, loc="upper left", fontsize=font_size)
+
+        # Mark clipped confidence intervals at panel edges for transparency.
+        xmin, xmax = ax_forest.get_xlim()
+        for j, outcome in enumerate(outcomes):
+            offset_sign = -1 if j == 1 else 1
+            y_offset = Y_OFFSET * offset_sign
+            for y, row in zip(y_positions, table_rows):
+                if row["is_cat"]:
+                    continue
+                pred = row["predictor"]
+                dfrow = df_final[
+                    (df_final["predictor"] == pred) & (df_final["outcome"] == outcome)
+                ]
+                if dfrow.empty:
+                    continue
+                dfrow = dfrow.iloc[0]
+                eff, lo, hi = (
+                    dfrow.get("effect", np.nan),
+                    dfrow.get("ci_low", np.nan),
+                    dfrow.get("ci_high", np.nan),
+                )
+                if pd.isna(eff) or pd.isna(lo) or pd.isna(hi):
+                    continue
+                yy = y + y_offset
+                if lo < xmin:
+                    ax_forest.plot(
+                        [xmin],
+                        [yy],
+                        marker="<",
+                        color=colors[j],
+                        markersize=6,
+                        zorder=4,
+                    )
+                if hi > xmax:
+                    ax_forest.plot(
+                        [xmax],
+                        [yy],
+                        marker=">",
+                        color=colors[j],
+                        markersize=6,
+                        zorder=4,
+                    )
+        ax_forest.legend(handles, labels, loc="upper left", fontsize=render_font_size)
 
     if footer_text:
         fig.text(
@@ -360,7 +462,7 @@ def forest_plot(
             footer_text,
             ha="center",
             va="bottom",
-            fontsize=font_size * 0.9,
+            fontsize=render_font_size * 0.9,
             color="dimgray",
             style="italic",
         )
