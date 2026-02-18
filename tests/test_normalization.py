@@ -78,20 +78,24 @@ def test_ordinal_drops_threshold_rows():
 
 
 # -----------------------------------------------------------
-# Double exponentiation guard
+# Exponentiation guard
 # -----------------------------------------------------------
 
-def test_no_double_exponentiation_if_already_exp_scaled():
-    """
-    If effect is already exponentiated (e.g., OR = 1),
-    running normalization should NOT exponentiate again.
-    """
+def test_log_link_exponentiates():
+    df = make_base_df("Estimate", 0.0)
+    clean_df, config = _normalize_model_output(df, "gamma", link="log")
 
-    df = make_base_df("OR", 1.0)  # already on multiplicative scale
-    clean_df, _ = _normalize_model_output(df, "binom")
+    assert clean_df["effect"].iloc[0] == 1.0
+    assert config["reference_line"] == 1.0
+    assert config["use_log"] is True
 
-    # If double-exp occurred, exp(1.0) = 2.718..., which would be wrong
-    assert np.isclose(clean_df["effect"].iloc[0], 1.0)
+def test_identity_link_no_exponentiation():
+    df = make_base_df("Estimate", 0.5)
+    clean_df, config = _normalize_model_output(df, "linear", link="identity")
+
+    assert clean_df["effect"].iloc[0] == 0.5
+    assert config["reference_line"] == 0.0
+    assert config["use_log"] is False
 
 
 # -----------------------------------------------------------

@@ -1,0 +1,190 @@
+from collections.abc import Mapping
+import math
+from typing import Any
+
+import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.ticker import FixedLocator, FuncFormatter, NullFormatter, NullLocator
+
+
+def _nice_linear_step(raw_step: float) -> float:
+    """Return a human-readable step size (1/2/5 x 10^k)."""
+    if raw_step <= 0:
+        return 1.0
+    exponent = math.floor(math.log10(raw_step))
+    fraction = raw_step / (10**exponent)
+    if fraction <= 1:
+        nice_fraction = 1
+    elif fraction <= 2:
+        nice_fraction = 2
+    elif fraction <= 5:
+        nice_fraction = 5
+    else:
+        nice_fraction = 10
+    return nice_fraction * (10**exponent)
+
+
+def _format_decimal(value: float, precision: int = 6) -> str:
+    """Format decimals consistently without scientific notation."""
+    return np.format_float_positional(value, precision=precision, trim="-")
+
+
+def _decimals_from_ticks(ticks: np.ndarray, max_decimals: int = 3) -> int:
+    """Infer a readable fixed decimal count from adjacent tick spacing."""
+    if len(ticks) < 2:
+        return 2
+    diffs = np.diff(np.sort(np.asarray(ticks, dtype=float)))
+    diffs = diffs[np.isfinite(diffs) & (diffs > 0)]
+    if not len(diffs):
+        return 2
+    min_diff = float(np.min(diffs))
+    decimals = int(max(0, -math.floor(math.log10(min_diff))))
+    return max(0, min(max_decimals, decimals))
+
+
+def configure_forest_axis(
+    ax: Axes,
+    model_type: str,
+    link: str | None,
+    thresholds: Mapping[str, Any] | None,
+    num_ticks: int,
+    font_size: int,
+    show_general_stats: bool,
+) -> Axes:
+    """
+    Configure forest-panel axis scaling, ticks, and visual styling.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axis for the forest panel.
+    model_type : str
+        Model family name (e.g., ``"binom"``, ``"gamma"``, ``"linear"``).
+    link : str | None
+        Link function name used by the model output normalization.
+    thresholds : Mapping[str, Any] | None
+        Explicit axis inputs. Supported keys include:
+        ``reference_line``, ``x_label``, ``use_log``, ``lo_all``, ``hi_all``,
+        and ``y_limits``.
+    num_ticks : int
+        Target number of major ticks for linear locators.
+    font_size : int
+        Axis label font size.
+    show_general_stats : bool
+        Included for API symmetry with plot orchestration.
+
+    Returns
+    -------
+    Axes
+        The configured axis.
+    """
+    _ = show_general_stats
+    cfg = dict(thresholds or {})
+    link_defaults = {
+        "logit": {"reference_line": 1.0, "use_log": True, "x_label": "Odds Ratio"},
+        "log": {"reference_line": 1.0, "use_log": True, "x_label": "Ratio"},
+        "identity": {"reference_line": 0.0, "use_log": False, "x_label": "Effect Size"},
+    }
+    defaults = link_defaults.get(link or "identity", link_defaults["identity"])
+
+    ref_val = float(cfg.get("reference_line", defaults["reference_line"]))
+    use_log = bool(cfg.get("use_log", defaults["use_log"]))
+    x_label = str(cfg.get("x_label", defaults["x_label"]))
+    tick_style = str(cfg.get("tick_style", "decimal"))
+    lo_all = np.asarray(cfg.get("lo_all", []), dtype=float)
+    hi_all = np.asarray(cfg.get("hi_all", []), dtype=float)
+    y_limits = cfg.get("y_limits")
+
+    ax.axvline(ref_val, color="#910C07", lw=1.2, ls="--")
+    ax.set_yticks([])
+    if y_limits is not None:
+        ax.set_ylim(y_limits[0], y_limits[1])
+
+    ax.set_xlabel(x_label, fontsize=font_size)
+    if len(lo_all) and len(hi_all):
+        finite_lo = lo_all[np.isfinite(lo_all)]
+        finite_hi = hi_all[np.isfinite(hi_all)]
+        if not len(finite_lo) or not len(finite_hi):
+            return ax
+
+        data_min = float(np.min(finite_lo))
+        data_max = float(np.max(finite_hi))
+
+        ax.set_xscale("log" if use_log else "linear")
+
+        if use_log:
+            if ref_val <= 0:
+                raise ValueError(
+                    "Log-scaled forest axis requires a positive reference value."
+                )
+            positive_candidates = [v for v in (data_min, data_max, ref_val) if v > 0]
+            if not positive_candidates:
+                raise ValueError(
+                    "Log-scaled forest axis requires positive effect/CI values."
+                )
+
+            pmin = min(positive_candidates)
+            pmax = max(positive_candidates)
+            target_ticks = max(int(num_ticks), 3)
+            if target_ticks % 2 == 0:
+                target_ticks -= 1
+            n_side = max((target_ticks - 1) // 2, 1)
+
+            span_ratio = max(pmax / ref_val, ref_val / pmin)
+            ratio_candidates = [1.05, 1.1, 1.2, 1.25, 1.5, 2.0]
+            ratio = None
+            for cand in ratio_candidates:
+                if cand**n_side >= span_ratio:
+                    ratio = cand
+                    break
+            if ratio is None:
+                ratio = span_ratio ** (1 / n_side)
+
+            powers = np.arange(-n_side, n_side + 1, dtype=float)
+            ticks = ref_val * np.power(ratio, powers)
+
+            axis_ratio = max(span_ratio * 1.05, ratio**n_side)
+            ax.set_xlim(ref_val / axis_ratio, ref_val * axis_ratio)
+            ax.xaxis.set_major_locator(FixedLocator(ticks))
+
+            if tick_style == "power10":
+
+                def _power10_formatter(x: float, _pos: int) -> str:
+                    exp = math.log10(x / ref_val)
+                    rounded = round(exp, 2)
+                    if math.isclose(ref_val, 1.0):
+                        return rf"$10^{{{rounded:g}}}$"
+                    return rf"${_format_decimal(ref_val)}\times10^{{{rounded:g}}}$"
+
+                ax.xaxis.set_major_formatter(FuncFormatter(_power10_formatter))
+            else:
+                decimals = _decimals_from_ticks(ticks)
+                ax.xaxis.set_major_formatter(
+                    FuncFormatter(lambda x, _pos, d=decimals: f"{x:.{d}f}")
+                )
+
+            ax.xaxis.set_minor_locator(NullLocator())
+            ax.xaxis.set_minor_formatter(NullFormatter())
+        else:
+            span = max(abs(data_min - ref_val), abs(data_max - ref_val))
+            if span == 0:
+                span = max(1.0, abs(ref_val) * 0.2)
+            target_ticks = max(int(num_ticks), 3)
+            raw_step = (2 * span) / max(target_ticks - 1, 1)
+            step = _nice_linear_step(raw_step)
+            kmax = max(1, math.ceil(span / step))
+            ticks = ref_val + np.arange(-kmax, kmax + 1, dtype=float) * step
+            xmin = ref_val - kmax * step
+            xmax = ref_val + kmax * step
+
+            ax.set_xlim(xmin, xmax)
+            ax.xaxis.set_major_locator(FixedLocator(ticks))
+            decimals = _decimals_from_ticks(ticks)
+            ax.xaxis.set_major_formatter(
+                FuncFormatter(lambda x, _pos, d=decimals: f"{x:.{d}f}")
+            )
+
+    for spine in ("top", "right", "left"):
+        ax.spines[spine].set_visible(False)
+
+    return ax
