@@ -4,6 +4,8 @@ Publication-ready forest plots for regression model outputs in Python.
 
 `forestplotx` takes DataFrame output from logistic, linear, ordinal, or gamma regression models and produces a combined table + forest plot figure — ready for papers, reports, and presentations.
 
+![Two Outcomes with General Stats](examples/layout_case1_general_true_two_outcomes.png)
+
 ## Features
 
 - **Multiple model types** — binomial (logistic), linear, gamma, and ordinal (cumulative logit)
@@ -12,7 +14,15 @@ Publication-ready forest plots for regression model outputs in Python.
 - **Dual-outcome layout** — side-by-side comparison of up to two outcomes
 - **Category grouping** — optional row grouping with bold category headers
 - **Deterministic layout presets** — fixed internal geometry for 4 core display cases
+- **Adaptive small-table sizing** — compact height heuristic for low row counts
 - **Static matplotlib output** — high-resolution, saveable figures
+
+## Layout Examples
+
+- `examples/layout_case1_general_true_two_outcomes.png`
+- `examples/layout_case2_general_true_one_outcome.png`
+- `examples/layout_case3_general_false_two_outcomes.png`
+- `examples/layout_case4_general_false_one_outcome.png`
 
 ## Installation
 
@@ -83,6 +93,7 @@ The `link` parameter can override the default — for example, `model_type="bino
 | `N` | Total count |
 
 **Note:** For `logit`/`log` links, `exponentiate=None` applies model-based exponentiation with a warning; set `exponentiate=False` if your data is already on effect scale.
+Displayed CI values in the table use bracket notation: `[low,high]`.
 
 ## API Reference
 
@@ -96,7 +107,7 @@ fig, axes = fpx.forest_plot(
     exponentiate=None,               # None=auto by link, True=force, False=disable
     outcomes=None,                   # list[str], max 2; auto-detected if None
     legend_labels=None,              # list[str] override for legend entries
-    footer_text=None,                # Italic footer below the plot
+    footer_text=None,                # Italic footer (wrapped/capped internally)
     show_general_stats=True,         # Show n / N / Freq columns
     bold_override=None,              # Manual bold control per predictor/outcome
     base_decimals=2,                 # Decimal places for effect / CI values
@@ -124,6 +135,8 @@ When `exponentiate=None`, auto exponentiation for log/logit links emits a warnin
 
 This is intentional to keep output stable and publication-ready across common use cases.
 `base_decimals` is capped at 3 internally to prevent table collisions in dense layouts.
+For small row counts, figure height uses a tighter internal heuristic to reduce excessive whitespace.
+Long footer text is wrapped and capped to 3 lines with ellipsis for overflow protection.
 
 ### Exponentiation Safety
 
@@ -196,6 +209,9 @@ fig, axes = fpx.forest_plot(df, model_type="binom", show=False)
 fig.suptitle("My Forest Plot", fontsize=16)
 fig.savefig("custom_plot.pdf", dpi=300)
 ```
+
+In notebooks, `show=False` prevents internal `plt.show()`, but Jupyter may still auto-render
+the returned figure object. Use `plt.close(fig)` to suppress display.
 
 ## Testing
 

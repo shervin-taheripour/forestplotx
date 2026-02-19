@@ -178,6 +178,30 @@ df_linear_with_counts["N"] = df_linear_with_counts["n"] + np.random.randint(50, 
 df_binom_nulls = df_binom.copy()
 mask = (df_binom_nulls["predictor"] == "predictor3") & (df_binom_nulls["outcome"] == "outcome1")
 df_binom_nulls.loc[mask, ["OR", "CI_low", "CI_high"]] = np.nan
+
+# --- G9: Linear with only 3 predictors ---
+keep_preds = df_linear["predictor"].dropna().unique()[:3]
+df_linear_3pred = df_linear[df_linear["predictor"].isin(keep_preds)].copy()
+
+# --- G10: Linear expanded to 30 predictors ---
+rows = []
+base_preds = list(df_linear["predictor"].dropna().unique())
+base_outcomes = list(df_linear["outcome"].dropna().unique())
+for i in range(30):
+    base_pred = base_preds[i % len(base_preds)]
+    for outcome in base_outcomes[:2]:
+        src = df_linear[(df_linear["predictor"] == base_pred) & (df_linear["outcome"] == outcome)]
+        src = src.iloc[0].to_dict()
+        src["predictor"] = f"predictor_{i+1:02d}"
+        src["outcome"] = outcome
+        rows.append(src)
+df_linear_30pred = pd.DataFrame(rows)
+
+# --- G11: Linear where only 2 predictors have values (8 predictors NaN) ---
+df_linear_sparse = df_linear.copy()
+keep_preds = set(df_linear_sparse["predictor"].dropna().unique()[:2])
+mask_nan = ~df_linear_sparse["predictor"].isin(keep_preds)
+df_linear_sparse.loc[mask_nan, ["Estimate", "CI_low", "CI_high"]] = np.nan
 ```
 
 ---
@@ -203,6 +227,20 @@ df_binom_nulls.loc[mask, ["OR", "CI_low", "CI_high"]] = np.nan
 
 These are already covered by pytest but worth a quick visual confirmation that the error
 messages are clear and helpful.
+
+---
+
+### J. Additional stress cases (5 tests)
+
+| ID | Base dataset | Scenario | Call snippet | Verify |
+|:---|:-------------|:---------|:-------------|:-------|
+| J1 | binom | Extremely long footer | `footer_text="<very long text>"` | Footer remains visible, no frame collision, no axis overlap |
+| J2 | binom | Multiline footer (3 lines) | `footer_text="line1\nline2\nline3"` | All lines rendered, readable, and contained in figure |
+| J3 | linear | Only 3 predictors | Use modified dataset with 3 predictors | Height floor/layout remains readable; rows not stretched awkwardly |
+| J4 | linear | 30 predictors | Use expanded dataset with 30 predictors | Dynamic height scales correctly; no clipping/crowding in table/forest |
+| J5 | linear | 2 predictors with values + 8 NaN predictors | Use modified dataset with NaN effect/CI for 8 predictors | NaN rows remain listed and appear grayed out in table + forest markers |
+
+These tests are implemented in `tests/run_visual_tests.py` as `J1`–`J5`.
 
 ---
 

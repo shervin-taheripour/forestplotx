@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from os import PathLike
 from matplotlib.patches import Rectangle
+import textwrap
 
 from ._axes_config import configure_forest_axis
 from ._layout import build_row_layout
@@ -10,7 +11,7 @@ from ._normalize import _normalize_model_output
 
 
 def forest_plot(
-    df_final,
+    df,
     outcomes=None,
     save=None,
     model_type="binom",
@@ -42,14 +43,14 @@ def forest_plot(
 
     bold_override = bold_override or {}
     if outcomes is None:
-        outcomes = df_final["outcome"].unique().tolist()
+        outcomes = df["outcome"].unique().tolist()
     if len(outcomes) > 2:
         outcomes = outcomes[:2]
     has_second = len(outcomes) == 2
 
     # --- Normalize model output ----------------------------------------------
-    df_final, plot_config = _normalize_model_output(
-        df_final,
+    df, plot_config = _normalize_model_output(
+        df,
         model_type=model_type,
         link=link,
         exponentiate=exponentiate,
@@ -67,14 +68,17 @@ def forest_plot(
         eff_s = f"{eff:.{d}f}" if pd.notnull(eff) else ""
         lo_s = f"{lo:.{d}f}" if pd.notnull(lo) else ""
         hi_s = f"{hi:.{d}f}" if pd.notnull(hi) else ""
-        ci_s = f"{lo_s}\u2013{hi_s}" if lo_s and hi_s else ""
+        ci_s = f"[{lo_s},{hi_s}]" if lo_s and hi_s else ""
         p_s = "" if pd.isnull(p) else ("<0.001" if p < 0.001 else f"{p:.3f}")
         return eff_s, ci_s, p_s, d
 
-    layout = build_row_layout(df_final)
+    layout = build_row_layout(df)
     table_rows = layout["rows"].to_dict("records")
     y_positions = layout["y_positions"]
     n = layout["meta"]["n"]
+    fig_height = max(0.3 * n + 1.5, 5.0)
+    if n <= 8:
+        fig_height = max(0.26 * n + 1.2, 3.4)
 
     # 4-case layout presets:
     # (show_general_stats, has_second_outcome) -> geometry config.
@@ -120,13 +124,13 @@ def forest_plot(
     OUTCOME_OFFSETS = layout_cfg["outcome_offsets"]
 
     if table_only:
-        fig, ax_text = plt.subplots(1, 1, figsize=(15, 0.3 * n + 1.5))
+        fig, ax_text = plt.subplots(1, 1, figsize=(15, fig_height))
         ax_forest = None
     else:
         fig, (ax_text, ax_forest) = plt.subplots(
             1,
             2,
-            figsize=(layout_cfg["fig_width"], 0.3 * n + 1.5),
+            figsize=(layout_cfg["fig_width"], fig_height),
             gridspec_kw={"width_ratios": layout_cfg["width_ratios"]},
         )
         plt.subplots_adjust(wspace=0.02)
@@ -210,7 +214,7 @@ def forest_plot(
             )
             continue
 
-        dfrow_pred = df_final[df_final["predictor"] == pred]
+        dfrow_pred = df[df["predictor"] == pred]
         if dfrow_pred.empty:
             continue
         dfrow = dfrow_pred.iloc[0]
@@ -235,7 +239,7 @@ def forest_plot(
 
         if show_general_stats:
             n_val = f"{int(dfrow['n'])}" if "n" in dfrow and pd.notnull(dfrow["n"]) else ""
-            N_val = f"{int(dfrow['N'])}" if "N" in dfrow and pd.notnull(dfrow["N"]) else ""
+            N_val = f"{int(dfrow['N']):,}".replace(",", ".") if "N" in dfrow and pd.notnull(dfrow["N"]) else ""
             freq_val = ""
             if n_val and N_val:
                 try:
@@ -257,8 +261,8 @@ def forest_plot(
 
         for k, outcome in enumerate(outcomes):
             out_block = "outcome1" if k == 0 else "outcome2"
-            dfrow = df_final[
-                (df_final["predictor"] == pred) & (df_final["outcome"] == outcome)
+            dfrow = df[
+                (df["predictor"] == pred) & (df["outcome"] == outcome)
             ]
             if dfrow.empty:
                 continue
@@ -338,8 +342,8 @@ def forest_plot(
                 if row["is_cat"]:
                     continue
                 pred = row["predictor"]
-                dfrow = df_final[
-                    (df_final["predictor"] == pred) & (df_final["outcome"] == outcome)
+                dfrow = df[
+                    (df["predictor"] == pred) & (df["outcome"] == outcome)
                 ]
                 if dfrow.empty:
                     continue
@@ -421,8 +425,8 @@ def forest_plot(
                 if row["is_cat"]:
                     continue
                 pred = row["predictor"]
-                dfrow = df_final[
-                    (df_final["predictor"] == pred) & (df_final["outcome"] == outcome)
+                dfrow = df[
+                    (df["predictor"] == pred) & (df["outcome"] == outcome)
                 ]
                 if dfrow.empty:
                     continue
@@ -456,10 +460,17 @@ def forest_plot(
         ax_forest.legend(handles, labels, loc="upper left", fontsize=render_font_size)
 
     if footer_text:
+        wrapped = textwrap.wrap(str(footer_text), width=150)
+        max_lines = 3
+        if len(wrapped) > max_lines:
+            wrapped = wrapped[:max_lines]
+            if wrapped[-1]:
+                wrapped[-1] = wrapped[-1].rstrip(". ") + "..."
+        footer_display = "\n".join(wrapped)
         fig.text(
             0.5,
             0.01,
-            footer_text,
+            footer_display,
             ha="center",
             va="bottom",
             fontsize=render_font_size * 0.9,

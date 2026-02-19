@@ -22,7 +22,7 @@ def test_forest_plot_smoke_returns_figure_and_axes():
 
     with pytest.warns(UserWarning):
         fig, axes = forest_plot(
-            df_final=df,
+            df=df,
             outcomes=["y1", "y2"],
             model_type="binom",
             show=False,
@@ -50,7 +50,7 @@ def test_forest_plot_single_point_color_with_two_outcomes():
 
     with pytest.warns(UserWarning):
         fig, axes = forest_plot(
-            df_final=df,
+            df=df,
             outcomes=["y1", "y2"],
             model_type="binom",
             point_colors=["#2C5F8A"],

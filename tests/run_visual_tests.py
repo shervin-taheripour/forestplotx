@@ -103,6 +103,47 @@ def build_modified_datasets(ds: dict[str, pd.DataFrame]) -> dict[str, pd.DataFra
     d.loc[m, ["OR", "CI_low", "CI_high"]] = np.nan
     out["binom_nulls"] = d
 
+    # G9: Linear subset with only 3 predictors (all outcomes retained)
+    d = ds["linear"].copy()
+    keep_preds = list(d["predictor"].dropna().unique()[:3])
+    out["linear_3pred"] = d[d["predictor"].isin(keep_preds)].copy()
+
+    # G10: Linear expanded to 30 predictors (2 outcomes each)
+    d = ds["linear"].copy()
+    base_preds = list(d["predictor"].dropna().unique())
+    base_outcomes = list(d["outcome"].dropna().unique())
+    rows: list[dict[str, Any]] = []
+    for i in range(30):
+        base_pred = base_preds[i % len(base_preds)]
+        for outcome in base_outcomes[:2]:
+            src = d[(d["predictor"] == base_pred) & (d["outcome"] == outcome)]
+            if src.empty:
+                src = d[d["predictor"] == base_pred].head(1)
+            if src.empty:
+                continue
+            row = src.iloc[0].to_dict()
+            row["predictor"] = f"predictor_{i+1:02d}"
+            row["outcome"] = outcome
+            # Small deterministic jitter to avoid complete duplication.
+            delta = ((i % 5) - 2) * 0.02
+            if "Estimate" in row and pd.notnull(row["Estimate"]):
+                row["Estimate"] = float(row["Estimate"]) + delta
+            if "CI_low" in row and pd.notnull(row["CI_low"]):
+                row["CI_low"] = float(row["CI_low"]) + delta
+            if "CI_high" in row and pd.notnull(row["CI_high"]):
+                row["CI_high"] = float(row["CI_high"]) + delta
+            rows.append(row)
+    out["linear_30pred"] = pd.DataFrame(rows)
+
+    # G11: Linear data where only 2/10 predictors have effect values; others are NaN.
+    d = ds["linear"].copy()
+    keep_preds = set(d["predictor"].dropna().unique()[:2])
+    mask_nan = ~d["predictor"].isin(keep_preds)
+    for col in ("Estimate", "CI_low", "CI_high"):
+        if col in d.columns:
+            d.loc[mask_nan, col] = np.nan
+    out["linear_2_with_values_8_nan"] = d
+
     # Error-path helpers
     out["empty"] = pd.DataFrame(
         columns=["predictor", "outcome", "Estimate", "CI_low", "CI_high"]
@@ -169,6 +210,12 @@ def build_cases() -> list[Case]:
         Case("I2", "missing effect", "missing_effect", dict(model_type="linear"), expect_error="ValueError"),
         Case("I3", "invalid model_type", "linear", dict(model_type="poisson"), expect_error="ValueError"),
         Case("I4", "category all NaN", "binom_cat_nan", dict(model_type="binom", exponentiate=False)),
+        # J
+        Case("J1", "footer extremely long", "binom", dict(model_type="binom", exponentiate=False, footer_text="Adjusted for age, sex, BMI, smoking status, diabetes, hypertension, prior cardiovascular events, renal function stage, liver function profile, frailty index, baseline medication burden, and center-level random effects; sensitivity analyses excluded protocol deviations, missing baseline laboratory panels, and incomplete follow-up observations across all treatment strata.")),
+        Case("J2", "footer multiline (3 lines)", "binom", dict(model_type="binom", exponentiate=False, footer_text="Line 1: adjusted for age/sex\nLine 2: robust SE + center effects\nLine 3: sensitivity excludes missing labs")),
+        Case("J3", "only 3 predictors", "linear_3pred", dict(model_type="linear")),
+        Case("J4", "30 predictors", "linear_30pred", dict(model_type="linear")),
+        Case("J5", "2 predictors with values + 8 NaN (gray rows)", "linear_2_with_values_8_nan", dict(model_type="linear")),
     ]
 
 
@@ -194,7 +241,7 @@ def run_case(case: Case, datasets: dict[str, pd.DataFrame], out_plots: Path) -> 
         warnings.simplefilter("always")
         fig = None
         try:
-            fig, _axes = fpx.forest_plot(df_final=df, **kwargs)
+            fig, _axes = fpx.forest_plot(df=df, **kwargs)
             if case.expect_error:
                 row["status"] = "FAIL"
                 row["error_message"] = f"Expected {case.expect_error} but no exception"
