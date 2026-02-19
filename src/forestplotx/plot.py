@@ -20,7 +20,6 @@ def forest_plot(
     legend_labels=None,
     point_colors: list[str] | None = None,
     footer_text=None,
-    block_spacing: float = 6.0,
     tick_style: str = "decimal",
     clip_outliers: bool = False,
     clip_quantiles: tuple[float, float] = (0.02, 0.98),
@@ -60,6 +59,8 @@ def forest_plot(
     use_log = plot_config["use_log"]
     xlabel = plot_config["x_label"]
     ci_label = "95% CI"
+    base_decimals = min(int(base_decimals), 3)
+    _BLOCK_SPACING = 6.0
 
     def format_effect_ci_p(eff, lo, hi, p):
         d = base_decimals
@@ -112,9 +113,9 @@ def forest_plot(
     render_font_size = 10
     BLOCK_X = {"predictor": 0.0}
     if show_general_stats:
-        BLOCK_X["general"] = block_spacing * layout_cfg["block_mult"]["general"]
-    BLOCK_X["outcome1"] = block_spacing * layout_cfg["block_mult"]["outcome1"]
-    BLOCK_X["outcome2"] = block_spacing * layout_cfg["block_mult"]["outcome2"]
+        BLOCK_X["general"] = _BLOCK_SPACING * layout_cfg["block_mult"]["general"]
+    BLOCK_X["outcome1"] = _BLOCK_SPACING * layout_cfg["block_mult"]["outcome1"]
+    BLOCK_X["outcome2"] = _BLOCK_SPACING * layout_cfg["block_mult"]["outcome2"]
     GENERAL_OFFSETS = layout_cfg["general_offsets"]
     OUTCOME_OFFSETS = layout_cfg["outcome_offsets"]
 

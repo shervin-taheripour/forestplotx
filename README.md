@@ -99,9 +99,10 @@ fig, axes = fpx.forest_plot(
     footer_text=None,                # Italic footer below the plot
     show_general_stats=True,         # Show n / N / Freq columns
     bold_override=None,              # Manual bold control per predictor/outcome
-    block_spacing=6.0,               # Horizontal spacing between table blocks
     base_decimals=2,                 # Decimal places for effect / CI values
     tick_style="decimal",            # "decimal" or "power10" (readable log10 exponents)
+    clip_outliers=False,             # Clip axis limits by quantiles (opt-in)
+    clip_quantiles=(0.02, 0.98),     # Low/high quantiles used when clipping
     point_colors=None,               # list[str], up to 2 hex codes for outcome markers
     table_only=False,                # Render table without forest panel
     show=True,                       # Call plt.show(); set False for programmatic use
@@ -122,13 +123,14 @@ When `exponentiate=None`, auto exponentiation for log/logit links emits a warnin
 4. `show_general_stats=False` + one outcome
 
 This is intentional to keep output stable and publication-ready across common use cases.
+`base_decimals` is capped at 3 internally to prevent table collisions in dense layouts.
 
 ### Exponentiation Safety
 
 - Use `exponentiate=None` (default) for model/link-based automatic handling.
 - Use `exponentiate=False` if your input is already on effect scale (e.g., OR/Ratio, not log-coefficients).
 - Use `exponentiate=True` only when input is definitely on log scale and needs transformation.
-- Read warnings: they are emitted to prevent silent double exponentiation mistakes.
+- Read warnings: they include auto-exponentiation context and column mapping (effect column + `CI_low`/`CI_high` combined into `95% CI`).
 
 ### `normalize_model_output()`
 

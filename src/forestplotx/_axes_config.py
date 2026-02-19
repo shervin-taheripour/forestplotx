@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 import math
+import warnings
 from typing import Any
 
 import numpy as np
@@ -44,7 +45,7 @@ def _decimals_from_ticks(ticks: np.ndarray, max_decimals: int = 3) -> int:
 
 def _nice_log_step(raw_step: float) -> float:
     """Return a readable log10 step size."""
-    candidates = [0.05, 0.1, 0.2, 0.25, 0.5, 1.0]
+    candidates = [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0]
     for cand in candidates:
         if cand >= raw_step:
             return cand
@@ -137,7 +138,30 @@ def configure_forest_axis(
                 raise ValueError(
                     "Log-scaled forest axis requires a positive reference value."
                 )
-            positive_candidates = [v for v in (data_min, data_max, ref_val) if v > 0]
+            finite_eff = np.asarray(cfg.get("eff_all", []), dtype=float)
+            finite_eff = finite_eff[np.isfinite(finite_eff)]
+            has_nonpositive = bool(
+                np.any(finite_lo <= 0)
+                or np.any(finite_hi <= 0)
+                or np.any(finite_eff <= 0)
+            )
+            if has_nonpositive:
+                warnings.warn(
+                    "Log-scaled forest axis received nonpositive effect/CI values. "
+                    "These values cannot be represented on a log axis and may be clipped. "
+                    "Check whether your data is already exponentiated or set exponentiate=True "
+                    "when input is on the link scale.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            positive_values = np.concatenate(
+                [
+                    finite_lo[finite_lo > 0],
+                    finite_hi[finite_hi > 0],
+                    finite_eff[finite_eff > 0],
+                ]
+            )
+            positive_candidates = [*positive_values.tolist(), ref_val]
             if not positive_candidates:
                 raise ValueError(
                     "Log-scaled forest axis requires positive effect/CI values."
@@ -151,16 +175,22 @@ def configure_forest_axis(
             n_side_target = max((target_ticks - 1) // 2, 1)
 
             span_decades = max(abs(math.log10(pmin / ref_val)), abs(math.log10(pmax / ref_val)))
-            axis_span_decades = max(span_decades * 1.05, 0.06)
-            axis_span_decades = min(axis_span_decades, span_decades + 0.08)
+            axis_span_decades = span_decades * 1.15
+            # Keep very tight ranges readable around the reference line.
+            axis_span_decades = max(axis_span_decades, 0.01)
             raw_step = axis_span_decades / n_side_target
             step_decades = _nice_log_step(raw_step)
             n_side = max(1, int(axis_span_decades / step_decades))
             exponents = np.arange(-n_side, n_side + 1, dtype=float) * step_decades
             ticks = ref_val * np.power(10.0, exponents)
             axis_ratio = 10 ** axis_span_decades
-            ax.set_xlim(ref_val / axis_ratio, ref_val * axis_ratio)
-            ax.xaxis.set_major_locator(FixedLocator(ticks))
+            xmin = ref_val / axis_ratio
+            xmax = ref_val * axis_ratio
+            ax.set_xlim(xmin, xmax)
+            ticks_in = ticks[(ticks >= xmin) & (ticks <= xmax)]
+            if len(ticks_in) < 3:
+                ticks_in = np.array([xmin, ref_val, xmax], dtype=float)
+            ax.xaxis.set_major_locator(FixedLocator(ticks_in))
 
             if tick_style == "power10":
 
@@ -176,7 +206,7 @@ def configure_forest_axis(
 
                 ax.xaxis.set_major_formatter(FuncFormatter(_power10_formatter))
             else:
-                decimals = max(2, _decimals_from_ticks(ticks))
+                decimals = max(2, _decimals_from_ticks(ticks_in))
                 ax.xaxis.set_major_formatter(
                     FuncFormatter(lambda x, _pos, d=decimals: f"{x:.{d}f}")
                 )
@@ -184,7 +214,41 @@ def configure_forest_axis(
             ax.xaxis.set_minor_locator(NullLocator())
             ax.xaxis.set_minor_formatter(NullFormatter())
         else:
-            span = max(abs(data_min - ref_val), abs(data_max - ref_val))
+            if clip_outliers:
+                q_high = float(clip_quantiles[1])
+                # Linear outliers are visually dominant; keep clipping robust by capping
+                # the effective upper quantile used for span control.
+                q_high = min(q_high, 0.90)
+                distances = np.concatenate(
+                    [
+                        np.abs(finite_lo - ref_val),
+                        np.abs(finite_hi - ref_val),
+                    ]
+                )
+                distances = distances[np.isfinite(distances)]
+                if len(distances):
+                    span = float(np.quantile(distances, q_high))
+                else:
+                    span = max(abs(data_min - ref_val), abs(data_max - ref_val))
+            else:
+                span = max(abs(data_min - ref_val), abs(data_max - ref_val))
+                # Flag outlier-dominated ranges where one extreme compresses the majority.
+                distances = np.concatenate(
+                    [
+                        np.abs(finite_lo - ref_val),
+                        np.abs(finite_hi - ref_val),
+                    ]
+                )
+                distances = distances[np.isfinite(distances)]
+                if len(distances) >= 8:
+                    q95 = float(np.quantile(distances, 0.95))
+                    if q95 > 0 and span / q95 >= 5:
+                        warnings.warn(
+                            "Linear axis appears outlier-dominated. Consider clip_outliers=True "
+                            "to improve readability while preserving raw table values.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
             if span == 0:
                 span = max(1e-3, abs(ref_val) * 0.1)
             target_ticks = max(int(num_ticks), 3)

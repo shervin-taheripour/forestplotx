@@ -104,13 +104,17 @@ def _normalize_model_output(df, model_type, link=None, exponentiate=None):
     }
 
     if exponentiate is None and should_exponentiate:
+        effect_map = config["renamed_columns"].get(effect_col, "effect")
+        ci_low_src = "CI_low" if "CI_low" in config["renamed_columns"] else "ci_low"
+        ci_high_src = "CI_high" if "CI_high" in config["renamed_columns"] else "ci_high"
         warnings.warn(
             (
                 f"Exponentiation applied automatically (model_type='{model_type}', "
                 f"link='{resolved_link}', effect_label='{config['effect_label']}'). "
                 "If your input data is already on the effect scale, set "
                 "exponentiate=False to prevent double transformation. "
-                f"Column mapping: {config['renamed_columns']}"
+                f"Column mapping: {effect_col} -> {effect_map}; "
+                f"{ci_low_src} + {ci_high_src} -> 95% CI."
             ),
             UserWarning,
             stacklevel=2,
