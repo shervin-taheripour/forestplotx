@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 src/forestplotx/__init__.py
@@ -5,6 +6,7 @@ src/forestplotx/_axes_config.py
 src/forestplotx/_layout.py
 src/forestplotx/_normalize.py
 src/forestplotx/plot.py
+src/forestplotx/py.typed
 src/forestplotx.egg-info/PKG-INFO
 src/forestplotx.egg-info/SOURCES.txt
 src/forestplotx.egg-info/dependency_links.txt
@@ -13,3 +15,4 @@ src/forestplotx.egg-info/top_level.txt
 tests/test_axes_config.py
 tests/test_layout.py
 tests/test_normalization.py
+tests/test_plot_smoke.py

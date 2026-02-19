@@ -8,12 +8,31 @@ version = "1.0.0"
 description = "Publication-ready forest plots for regression model outputs in Python."
 readme = "README.md"
 license = { text = "MIT" }
+authors = [
+    { name = "Shervin Taheripour", email = "shervintaheripour@fastmail.com" },
+]
 requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
 dependencies = [
     "matplotlib>=3.7",
     "numpy>=1.24",
     "pandas>=2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/shervin-taheripour/forestplotx"
+Repository = "https://github.com/shervin-taheripour/forestplotx"
+Issues = "https://github.com/shervin-taheripour/forestplotx/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -22,6 +41,9 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+forestplotx = ["py.typed"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

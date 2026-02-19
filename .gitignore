@@ -1,3 +1,25 @@
 .venv/
 __pycache__/
 .ipynb_checkpoints/
+*.py[cod]
+*.so
+
+# Build / packaging artifacts
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Type checker / linter caches
+.mypy_cache/
+.ruff_cache/
+
+# Local notebook/plot outputs
+forestplot.png
+tests/test_results/

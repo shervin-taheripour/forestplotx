@@ -227,9 +227,9 @@ pytest
 
 | File | Module under test | Tests |
 |:-----|:------------------|------:|
-| `tests/test_normalization.py` | `_normalize.py` | 8 |
+| `tests/test_normalization.py` | `_normalize.py` | 11 |
 | `tests/test_layout.py` | `_layout.py` | 33 |
-| `tests/test_axes_config.py` | `_axes_config.py` | 64 |
+| `tests/test_axes_config.py` | `_axes_config.py` | 65 |
 | `tests/test_plot_smoke.py` | `plot.py` | 2 |
 
 ### Coverage summary
