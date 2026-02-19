@@ -30,7 +30,72 @@ def forest_plot(
     bold_override: dict | None = None,
 ):
     """
-    Create a detailed forest plot with table and optional footer + frame.
+    Render a publication-style forest plot with an aligned text table and optional footer.
+
+    This function normalizes model-output columns (via `_normalize_model_output`), builds a
+    row layout (via `_layout.build_row_layout`), and draws a two-panel figure:
+    table on the left and forest axis on the right. Up to two outcomes are displayed.
+
+    Key behavior:
+    - Layout is controlled by fixed internal presets for 4 cases:
+      (show_general_stats=True/False) x (one/two outcomes).
+    - Internal font size and block spacing are fixed for layout stability.
+    - `base_decimals` is capped at 3 to prevent dense-table collisions.
+    - CI text is displayed in bracket notation: `[low,high]`.
+    - For log-link models, exponentiation can be auto/resolved with `exponentiate`.
+    - `clip_outliers` is opt-in and affects axis limits only (table values remain raw).
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input model-output data. Must include `predictor`, `outcome`, one recognized
+        effect column (`OR`, `Ratio`, `Estimate`, `beta`, `Coef`, or `effect`), and
+        CI bounds (`CI_low`/`ci_low`, `CI_high`/`ci_high`).
+    outcomes : list[str] | None, default None
+        Outcomes to plot. If None, auto-detected from `df`. Maximum 2 outcomes are used.
+    save : str | os.PathLike | bool | None, default None
+        Save behavior:
+        - `None` or `False`: do not save
+        - `True`: save as `"forestplot.png"`
+        - path-like/string: save to that path
+    model_type : {"binom","gamma","linear","ordinal"}, default "binom"
+        Model family used for normalization and axis defaults.
+    link : str | None, default None
+        Optional link override. If None, defaults from `model_type` are used.
+    exponentiate : bool | None, default None
+        Exponentiation policy:
+        - `None`: automatic by link
+        - `True`: force exponentiation
+        - `False`: disable exponentiation
+    table_only : bool, default False
+        If True, render only the table panel (no forest axis).
+    legend_labels : list[str] | None, default None
+        Custom legend labels for plotted outcomes.
+    point_colors : list[str] | None, default None
+        Marker colors for outcomes (up to 2). Missing entries fall back to defaults.
+    footer_text : str | None, default None
+        Optional footer. Wrapped internally and capped to 3 lines with ellipsis for overflow.
+    tick_style : {"decimal","power10"}, default "decimal"
+        Tick label style for log-axis rendering.
+    clip_outliers : bool, default False
+        If True, use quantile-based clipping for axis limits to improve readability in
+        outlier-heavy plots. Clipped CIs are marked at axis boundaries.
+    clip_quantiles : tuple[float, float], default (0.02, 0.98)
+        Quantiles used when `clip_outliers=True`; must satisfy `0 <= low < high <= 1`.
+    base_decimals : int, default 2
+        Decimal precision for effect/CI display (internally capped at 3).
+    show : bool, default True
+        If True, call `plt.show()`. In notebooks, returned figures may still auto-render
+        even when `show=False`.
+    show_general_stats : bool, default True
+        Show/hide `n`, `N`, and `Freq` table columns.
+    bold_override : dict | None, default None
+        Optional manual bold override map by predictor/outcome.
+
+    Returns
+    -------
+    tuple
+        `(fig, (ax_text, ax_forest))`, where `ax_forest` is `None` when `table_only=True`.
     """
     if save is None or save is False:
         save_path = None
