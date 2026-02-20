@@ -7,7 +7,7 @@ name = "forestplotx"
 version = "1.0.0"
 description = "Publication-ready forest plots for regression model outputs in Python."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
     { name = "Shervin Taheripour", email = "shervintaheripour@fastmail.com" },
 ]
@@ -15,7 +15,6 @@ requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",

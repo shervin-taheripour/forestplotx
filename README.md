@@ -118,22 +118,22 @@ Displayed CI values in the table use bracket notation: `[low,high]`.
 ```python
 fig, axes = fpx.forest_plot(
     df,                              # DataFrame with model output
+    outcomes=None,                   # list[str], max 2; auto-detected if None
+    save=None,                       # File path to save (e.g. "plot.png")
     model_type="binom",              # "binom" | "gamma" | "linear" | "ordinal"
     link=None,                       # Override default link function
     exponentiate=None,               # None=auto by link, True=force, False=disable
-    outcomes=None,                   # list[str], max 2; auto-detected if None
+    table_only=False,                # Render table without forest panel
     legend_labels=None,              # list[str] override for legend entries
+    point_colors=None,               # list[str], up to 2 hex codes for outcome markers
     footer_text=None,                # Italic footer (wrapped/capped internally)
-    show_general_stats=True,         # Show n / N / Freq columns
-    bold_override=None,              # Manual bold control per predictor/outcome
-    base_decimals=2,                 # Decimal places for effect / CI values
     tick_style="decimal",            # "decimal" or "power10" (readable log10 exponents)
     clip_outliers=False,             # Clip axis limits by quantiles (opt-in)
     clip_quantiles=(0.02, 0.98),     # Low/high quantiles used when clipping
-    point_colors=None,               # list[str], up to 2 hex codes for outcome markers
-    table_only=False,                # Render table without forest panel
+    base_decimals=2,                 # Decimal places for effect / CI values
     show=True,                       # Call plt.show(); set False for programmatic use
-    save=None,                       # File path to save (e.g. "plot.png")
+    show_general_stats=True,         # Show n / N / Freq columns
+    bold_override=None,              # Manual bold control per predictor/outcome
 )
 ```
 
@@ -272,7 +272,7 @@ pytest
 - `_decimals_from_ticks`: empty/single-tick → 2, step-inferred decimals (0/1/2), `max_decimals` cap
 - Reference line: `axvline` placed at correct x for logit (1.0), log (1.0), identity (0.0); `#910C07` color; dashed style; threshold override
 - X-scale: `"log"` for logit/log links, `"linear"` for identity; empty data and `thresholds=None` do not crash
-- X-label: correct label per link (`"Odds Ratio"` / `"Ratio"` / `"Effect Size"`), threshold override, font size propagated
+- X-label: correct label per link (`"Odds Ratio"` / `"Ratio"` / `"β (coefficient)"`), threshold override, font size propagated
 - Y-ticks cleared; y-limits applied from `thresholds["y_limits"]`
 - Spine visibility: top/right/left hidden, bottom visible
 - X-limits contain full data range for log and linear axes; negative reference raises `ValueError`; span=0 edge case handled
