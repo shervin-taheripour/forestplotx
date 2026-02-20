@@ -1,3 +1,7 @@
+![CI](https://github.com/shervin-taheripour/forestplotx/actions/workflows/ci.yml/badge.svg)
+[![PyPI version](https://img.shields.io/pypi/v/forestplotx.svg)](https://pypi.org/project/forestplotx/)
+[![Python](https://img.shields.io/pypi/pyversions/forestplotx.svg)](https://pypi.org/project/forestplotx/)
+[![License](https://img.shields.io/pypi/l/forestplotx.svg)](LICENSE)
 # forestplotx
 
 Publication-ready forest plots for regression model outputs in Python.
