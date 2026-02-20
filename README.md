@@ -262,6 +262,15 @@ pytest
 
 **Not included:** interactive plots, Cox/Poisson models, theming engine, or GUI.
 
+## Versioning
+
+`forestplotx` follows semantic versioning (SemVer).
+
+- `MAJOR` – breaking API changes  
+- `MINOR` – backward-compatible feature additions  
+- `PATCH` – bug fixes and internal improvements  
+
+Current version: **1.0.0**
 ## License
 
 MIT
