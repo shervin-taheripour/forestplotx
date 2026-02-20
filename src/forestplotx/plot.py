@@ -4,6 +4,7 @@ import pandas as pd
 from os import PathLike
 from matplotlib.patches import Rectangle
 import textwrap
+import warnings
 
 from ._axes_config import configure_forest_axis
 from ._layout import build_row_layout
@@ -150,8 +151,8 @@ def forest_plot(
     # For now, all four cases intentionally share the same values.
     layout_presets = {
         (True, True): {
-            "block_mult": {"general": 1.09, "outcome1": 1.74, "outcome2": 2.74},
-            "general_offsets": [0.0, 1.2, 2.7],
+            "block_mult": {"general": 1.06, "outcome1": 1.74, "outcome2": 2.74},
+            "general_offsets": [0.0, 1.45, 3.15],
             "outcome_offsets": [0.0, 2.0, 4.1],
             "fig_width": 16,
             "width_ratios": [1.9, 1.1],
@@ -167,7 +168,7 @@ def forest_plot(
             "block_mult": {"general": 1.2, "outcome1": 1.30, "outcome2": 2.30},
             "general_offsets": [0.0, 1.3, 2.6],
             "outcome_offsets": [0.0, 2.1, 4.3],
-            "fig_width": 13,
+            "fig_width": 14,
             "width_ratios": [1.9, 1.2],
         },
         (False, False): {
@@ -179,6 +180,13 @@ def forest_plot(
         },
     }
     layout_cfg = layout_presets[(show_general_stats, has_second)]
+    predictor_label_caps = {
+        (True, True): 21,
+        (True, False): 24,
+        (False, True): 26,
+        (False, False): 25,
+    }
+    predictor_label_cap = predictor_label_caps[(show_general_stats, has_second)]
     render_font_size = 10
     BLOCK_X = {"predictor": 0.0}
     if show_general_stats:
@@ -187,6 +195,95 @@ def forest_plot(
     BLOCK_X["outcome2"] = _BLOCK_SPACING * layout_cfg["block_mult"]["outcome2"]
     GENERAL_OFFSETS = layout_cfg["general_offsets"]
     OUTCOME_OFFSETS = layout_cfg["outcome_offsets"]
+
+    n_vals_all = (
+        pd.to_numeric(df["n"], errors="coerce")
+        if "n" in df.columns
+        else pd.Series(dtype=float)
+    )
+    N_vals_all = (
+        pd.to_numeric(df["N"], errors="coerce")
+        if "N" in df.columns
+        else pd.Series(dtype=float)
+    )
+
+    def _pick_compact_unit(vals: pd.Series) -> tuple[float, str]:
+        if vals.empty or not vals.notna().any():
+            return 1.0, ""
+        vmax = float(vals.max())
+        if vmax < 10_000:
+            return 1.0, ""
+        if vmax >= 1_000_000_000_000:
+            return 1_000_000_000_000.0, "T"
+        if vmax >= 1_000_000_000:
+            return 1_000_000_000.0, "B"
+        if vmax >= 1_000_000:
+            return 1_000_000.0, "M"
+        if vmax >= 10_000:
+            return 1_000.0, "k"
+        return 1.0, ""
+
+    if show_general_stats:
+        combined_counts = pd.concat([n_vals_all, N_vals_all], axis=0)
+        shared_scale, shared_suffix = _pick_compact_unit(combined_counts)
+    else:
+        shared_scale, shared_suffix = 1.0, ""
+    n_scale, n_suffix = shared_scale, shared_suffix
+    N_scale, N_suffix = shared_scale, shared_suffix
+    count_overflow_cap = 999.95 * 1_000_000_000_000.0
+    n_overflow = bool(show_general_stats and not n_vals_all.empty and n_vals_all.notna().any() and float(n_vals_all.max()) > count_overflow_cap)
+    N_overflow = bool(show_general_stats and not N_vals_all.empty and N_vals_all.notna().any() and float(N_vals_all.max()) > count_overflow_cap)
+    if n_overflow or N_overflow:
+        cols = []
+        if n_overflow:
+            cols.append("n")
+        if N_overflow:
+            cols.append("N")
+        warnings.warn(
+            f"Very large count values detected in {', '.join(cols)}; display is capped at >999T for readability.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    def _format_count(val: float, scale: float, suffix: str) -> str:
+        if pd.isna(val):
+            return ""
+        v = float(val)
+        if scale >= 1_000_000_000_000.0 and v > count_overflow_cap:
+            return ">999T"
+        if scale == 1.0:
+            return f"{int(v):,}".replace(",", ".")
+        compact = v / scale
+        txt = f"{compact:.1f}".replace(".", ",")
+        if txt.endswith(",0"):
+            txt = txt[:-2]
+        return f"{txt}{suffix}"
+
+    predictor_display_map: dict[str, str] = {}
+    truncated_predictors: list[str] = []
+    for row in table_rows:
+        if row["is_cat"]:
+            continue
+        pred = str(row["predictor"])
+        if pred in predictor_display_map:
+            continue
+        if len(pred) > predictor_label_cap:
+            predictor_display_map[pred] = pred[: predictor_label_cap - 3] + "..."
+            truncated_predictors.append(pred)
+        else:
+            predictor_display_map[pred] = pred
+
+    if truncated_predictors:
+        shown = ", ".join(f"'{p}'" for p in truncated_predictors[:3])
+        more = f" (+{len(truncated_predictors) - 3} more)" if len(truncated_predictors) > 3 else ""
+        warnings.warn(
+            f"Predictor label length exceeded cap ({predictor_label_cap}) for layout "
+            f"(show_general_stats={show_general_stats}, two_outcomes={has_second}). "
+            f"Labels were truncated for display: {shown}{more}.",
+            UserWarning,
+            stacklevel=2,
+        )
+    suppressed_null_triplets = 0
 
     if table_only:
         fig, ax_text = plt.subplots(1, 1, figsize=(15, fig_height))
@@ -285,17 +382,28 @@ def forest_plot(
         dfrow = dfrow_pred.iloc[0]
         style = dict(fontsize=render_font_size, fontweight="normal")
 
-        is_null = (
-            pd.isna(dfrow.get("effect"))
-            or pd.isna(dfrow.get("ci_low"))
-            or pd.isna(dfrow.get("ci_high"))
-        )
+        any_valid_outcome = False
+        for outcome in outcomes:
+            dfo = df[(df["predictor"] == pred) & (df["outcome"] == outcome)]
+            if dfo.empty:
+                continue
+            dfo = dfo.iloc[0]
+            is_missing_triplet = (
+                pd.isna(dfo.get("effect"))
+                or pd.isna(dfo.get("ci_low"))
+                or pd.isna(dfo.get("ci_high"))
+                or pd.isna(dfo.get("p_value"))
+            )
+            if not is_missing_triplet:
+                any_valid_outcome = True
+                break
+        is_null = not any_valid_outcome
         text_color = "#A0A0A0" if is_null else "black"
 
         ax_text.text(
             BLOCK_X["predictor"],
             y,
-            pred,
+            predictor_display_map.get(str(pred), str(pred)),
             ha="left",
             va="center",
             color=text_color,
@@ -303,8 +411,12 @@ def forest_plot(
         )
 
         if show_general_stats:
-            n_val = f"{int(dfrow['n'])}" if "n" in dfrow and pd.notnull(dfrow["n"]) else ""
-            N_val = f"{int(dfrow['N']):,}".replace(",", ".") if "N" in dfrow and pd.notnull(dfrow["N"]) else ""
+            n_val = ""
+            N_val = ""
+            if "n" in dfrow and pd.notnull(dfrow["n"]):
+                n_val = _format_count(dfrow["n"], n_scale, n_suffix)
+            if "N" in dfrow and pd.notnull(dfrow["N"]):
+                N_val = _format_count(dfrow["N"], N_scale, N_suffix)
             freq_val = ""
             if n_val and N_val:
                 try:
@@ -338,8 +450,12 @@ def forest_plot(
                 dfrow.get("ci_high", np.nan),
                 dfrow.get("p_value", np.nan),
             )
-            effect_val, ci, pval, _ = format_effect_ci_p(eff, lo, hi, p)
-            p_bold = pd.notnull(p) and p < 0.05
+            if pd.isna(eff) or pd.isna(lo) or pd.isna(hi) or pd.isna(p):
+                effect_val, ci, pval = "", "", ""
+                suppressed_null_triplets += 1
+            else:
+                effect_val, ci, pval, _ = format_effect_ci_p(eff, lo, hi, p)
+            p_bold = pd.notnull(p) and p < 0.05 and not (effect_val == "" and ci == "" and pval == "")
             manual_pred = bold_override.get(pred, {})
             manual_outcome = manual_pred.get(outcome, None)
 
@@ -418,7 +534,7 @@ def forest_plot(
                     dfrow.get("ci_low", np.nan),
                     dfrow.get("ci_high", np.nan),
                 )
-                is_null = pd.isna(eff) or pd.isna(lo) or pd.isna(hi)
+                is_null = pd.isna(eff) or pd.isna(lo) or pd.isna(hi) or pd.isna(dfrow.get("p_value"))
                 color = "#C7C7C7" if is_null else colors[j]
 
                 if not is_null:
@@ -523,6 +639,12 @@ def forest_plot(
                         zorder=4,
                     )
         ax_forest.legend(handles, labels, loc="upper left", fontsize=render_font_size)
+    if suppressed_null_triplets > 0:
+        warnings.warn(
+            f"Suppressed effect/CI/p display for {suppressed_null_triplets} predictor-outcome rows due to missing values.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     if footer_text:
         wrapped = textwrap.wrap(str(footer_text), width=150)

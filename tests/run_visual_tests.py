@@ -49,6 +49,7 @@ def load_base_datasets() -> dict[str, pd.DataFrame]:
 def build_modified_datasets(ds: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     np.random.seed(42)
     out = dict(ds)
+    long_pred = "Pneumonoultramicroscopicsilicovolcanoconiosis"
 
     # G1
     d = ds["binom"].copy()
@@ -144,6 +145,30 @@ def build_modified_datasets(ds: dict[str, pd.DataFrame]) -> dict[str, pd.DataFra
             d.loc[mask_nan, col] = np.nan
     out["linear_2_with_values_8_nan"] = d
 
+    # G12: Partial missing in single-outcome view with general stats (missing p only).
+    d = out["linear_with_counts"].copy()
+    m = (d["predictor"] == "predictor3") & (d["outcome"] == "outcome1")
+    d.loc[m, "p_value"] = np.nan
+    out["linear_with_counts_partial_single"] = d
+
+    # G13: Partial missing in two-outcome view with general stats (one outcome only).
+    d = out["linear_with_counts"].copy()
+    m = (d["predictor"] == "predictor3") & (d["outcome"] == "outcome1")
+    d.loc[m, "CI_high"] = np.nan
+    out["linear_with_counts_partial_dual"] = d
+
+    # G14: Long predictor label for truncation tests.
+    d = ds["linear"].copy()
+    first_pred = d["predictor"].dropna().unique()[0]
+    d.loc[d["predictor"] == first_pred, "predictor"] = long_pred
+    out["linear_long_pred"] = d
+
+    # G15: Long predictor label with n/N columns.
+    d = out["linear_with_counts"].copy()
+    first_pred = d["predictor"].dropna().unique()[0]
+    d.loc[d["predictor"] == first_pred, "predictor"] = long_pred
+    out["linear_with_counts_long_pred"] = d
+
     # Error-path helpers
     out["empty"] = pd.DataFrame(
         columns=["predictor", "outcome", "Estimate", "CI_low", "CI_high"]
@@ -216,6 +241,13 @@ def build_cases() -> list[Case]:
         Case("J3", "only 3 predictors", "linear_3pred", dict(model_type="linear")),
         Case("J4", "30 predictors", "linear_30pred", dict(model_type="linear")),
         Case("J5", "2 predictors with values + 8 NaN (gray rows)", "linear_2_with_values_8_nan", dict(model_type="linear")),
+        Case("J6", "single-outcome partial missing with general stats", "linear_with_counts_partial_single", dict(model_type="linear", show_general_stats=True, outcomes=["outcome1"])),
+        Case("J7", "two-outcome partial missing one outcome with general stats", "linear_with_counts_partial_dual", dict(model_type="linear", show_general_stats=True, outcomes=["outcome1", "outcome2"])),
+        # K: long predictor truncation behavior
+        Case("K1", "long predictor label (True, True)", "linear_with_counts_long_pred", dict(model_type="linear", show_general_stats=True, outcomes=["outcome1", "outcome2"])),
+        Case("K2", "long predictor label (True, False)", "linear_with_counts_long_pred", dict(model_type="linear", show_general_stats=True, outcomes=["outcome1"])),
+        Case("K3", "long predictor label (False, True)", "linear_long_pred", dict(model_type="linear", show_general_stats=False, outcomes=["outcome1", "outcome2"])),
+        Case("K4", "long predictor label (False, False)", "linear_long_pred", dict(model_type="linear", show_general_stats=False, outcomes=["outcome1"])),
     ]
 
 

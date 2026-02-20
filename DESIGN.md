@@ -60,6 +60,9 @@ Each decision below records what was chosen, what was rejected, and why, so the 
 - **Precision and formatting guardrails**:
   - `base_decimals` capped at 3 to protect table layout.
   - CI rendered as bracketed intervals (`[low,high]`) to avoid sign ambiguity.
+  - General stats counts switch to compact units only at `>= 10.000`, using one shared unit across `n` and `N` (`k/M/B/T`) for consistency.
+  - Extremely large counts are display-capped (`>999T`) with warning rather than overflowing layout.
+  - Missing-value rendering is strict per outcome triplet (`effect`, CI, `p`): partial-missing triplets are blanked; full-row gray is used only when all displayed outcomes are missing.
   - Long footers wrapped and capped to prevent layout breakage.
 
 ## Quality and Release Discipline

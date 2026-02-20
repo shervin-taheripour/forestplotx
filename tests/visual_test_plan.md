@@ -202,6 +202,32 @@ df_linear_sparse = df_linear.copy()
 keep_preds = set(df_linear_sparse["predictor"].dropna().unique()[:2])
 mask_nan = ~df_linear_sparse["predictor"].isin(keep_preds)
 df_linear_sparse.loc[mask_nan, ["Estimate", "CI_low", "CI_high"]] = np.nan
+
+# --- G12: Partial missing in single-outcome view with general stats ---
+df_linear_with_counts_partial_single = df_linear_with_counts.copy()
+mask = (df_linear_with_counts_partial_single["predictor"] == "predictor3") & (df_linear_with_counts_partial_single["outcome"] == "outcome1")
+df_linear_with_counts_partial_single.loc[mask, "p_value"] = np.nan
+
+# --- G13: Partial missing in two-outcome view with general stats ---
+df_linear_with_counts_partial_dual = df_linear_with_counts.copy()
+mask = (df_linear_with_counts_partial_dual["predictor"] == "predictor3") & (df_linear_with_counts_partial_dual["outcome"] == "outcome1")
+df_linear_with_counts_partial_dual.loc[mask, "CI_high"] = np.nan
+
+# --- G14: Long predictor label for truncation tests ---
+df_linear_long_pred = df_linear.copy()
+first_pred = df_linear_long_pred["predictor"].dropna().unique()[0]
+df_linear_long_pred.loc[
+    df_linear_long_pred["predictor"] == first_pred,
+    "predictor",
+] = "Pneumonoultramicroscopicsilicovolcanoconiosis"
+
+# --- G15: Long predictor label with n/N columns ---
+df_linear_with_counts_long_pred = df_linear_with_counts.copy()
+first_pred = df_linear_with_counts_long_pred["predictor"].dropna().unique()[0]
+df_linear_with_counts_long_pred.loc[
+    df_linear_with_counts_long_pred["predictor"] == first_pred,
+    "predictor",
+] = "Pneumonoultramicroscopicsilicovolcanoconiosis"
 ```
 
 ---
@@ -230,7 +256,7 @@ messages are clear and helpful.
 
 ---
 
-### J. Additional stress cases (5 tests)
+### J. Additional stress cases (7 tests)
 
 | ID | Base dataset | Scenario | Call snippet | Verify |
 |:---|:-------------|:---------|:-------------|:-------|
@@ -239,8 +265,19 @@ messages are clear and helpful.
 | J3 | linear | Only 3 predictors | Use modified dataset with 3 predictors | Height floor/layout remains readable; rows not stretched awkwardly |
 | J4 | linear | 30 predictors | Use expanded dataset with 30 predictors | Dynamic height scales correctly; no clipping/crowding in table/forest |
 | J5 | linear | 2 predictors with values + 8 NaN predictors | Use modified dataset with NaN effect/CI for 8 predictors | NaN rows remain listed and appear grayed out in table + forest markers |
+| J6 | linear + counts | Single-outcome partial missing with general stats | Use `df_linear_with_counts_partial_single`, `outcomes=["outcome1"]` | Row remains readable (not full gray), missing outcome triplet blanked, forest marker for missing row shown in gray |
+| J7 | linear + counts | Two-outcome partial missing in one outcome with general stats | Use `df_linear_with_counts_partial_dual`, `outcomes=["outcome1","outcome2"]` | Predictor/general stats remain black when one outcome is valid; only missing outcome triplet blanked and gray marker shown |
 
 These tests are implemented in `tests/run_visual_tests.py` as `J1`–`J5`.
+
+### K. Predictor truncation stress tests (4 tests)
+
+| ID | Base dataset | Scenario | Call snippet | Verify |
+|:---|:-------------|:---------|:-------------|:-------|
+| K1 | linear + counts | Long predictor label, layout (True, True) | `show_general_stats=True, outcomes=["outcome1","outcome2"]` | Long label is truncated with ellipsis; no collision with n/N/Freq or outcome1 block |
+| K2 | linear + counts | Long predictor label, layout (True, False) | `show_general_stats=True, outcomes=["outcome1"]` | Truncation preserves one-outcome layout readability |
+| K3 | linear | Long predictor label, layout (False, True) | `show_general_stats=False, outcomes=["outcome1","outcome2"]` | Truncation preserves two-outcome table readability |
+| K4 | linear | Long predictor label, layout (False, False) | `show_general_stats=False, outcomes=["outcome1"]` | Truncation preserves compact single-outcome table readability |
 
 ---
 

@@ -141,6 +141,15 @@ This is intentional to keep output stable and publication-ready across common us
 `base_decimals` is capped at 3 internally to prevent table collisions in dense layouts.
 For small row counts, figure height uses a tighter internal heuristic to reduce excessive whitespace.
 Long footer text is wrapped and capped to 3 lines with ellipsis for overflow protection.
+Predictor labels are truncated (with warning) when they exceed layout-specific caps:
+1. `show_general_stats=True` + two outcomes: 21 chars
+2. `show_general_stats=True` + one outcome: 24 chars
+3. `show_general_stats=False` + two outcomes: 26 chars
+4. `show_general_stats=False` + one outcome: 25 chars
+When general stats are shown, large `n`/`N` values are compacted (e.g., `78,6k`) to preserve column readability.
+Compaction activates only when counts reach `>= 10.000` and uses a shared unit across both `n` and `N` (`k`, `M`, `B`, `T`) for consistent within-row formatting.
+Very large values beyond display range are capped as `>999T` with a warning.
+Rows are fully grayed only when all displayed outcomes are missing; if at least one outcome is valid, only the missing outcome triplet (`effect`, `95% CI`, `p`) is blanked and gray-marked.
 
 ### Exponentiation Safety
 
@@ -234,7 +243,7 @@ pytest
 | `tests/test_normalization.py` | `_normalize.py` | 11 |
 | `tests/test_layout.py` | `_layout.py` | 33 |
 | `tests/test_axes_config.py` | `_axes_config.py` | 65 |
-| `tests/test_plot_smoke.py` | `plot.py` | 2 |
+| `tests/test_plot_smoke.py` | `plot.py` | 4 |
 
 ### Coverage summary
 
