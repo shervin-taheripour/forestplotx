@@ -93,7 +93,7 @@ def configure_forest_axis(
     link_defaults = {
         "logit": {"reference_line": 1.0, "use_log": True, "x_label": "Odds Ratio"},
         "log": {"reference_line": 1.0, "use_log": True, "x_label": "Ratio"},
-        "identity": {"reference_line": 0.0, "use_log": False, "x_label": "Effect Size"},
+        "identity": {"reference_line": 0.0, "use_log": False, "x_label": "β (coefficient)"},
     }
     defaults = link_defaults.get(link or "identity", link_defaults["identity"])
 

@@ -89,7 +89,7 @@ def _normalize_model_output(df, model_type, link=None, exponentiate=None):
         "x_label": {
             "logit": "Odds Ratio",
             "log": "Ratio",
-            "identity": "Effect Size",
+            "identity": "β (coefficient)",
         }[resolved_link],
         "reference_line": reference_line,
         "use_log": use_log,
@@ -97,7 +97,7 @@ def _normalize_model_output(df, model_type, link=None, exponentiate=None):
         "effect_label": {
             "logit": "OR",
             "log": "Ratio",
-            "identity": "Coef",
+            "identity": "β",
         }[resolved_link],
         "exponentiated": should_exponentiate,
         "renamed_columns": rename.copy(),
