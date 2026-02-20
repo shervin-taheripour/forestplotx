@@ -295,7 +295,7 @@ pytest
 - `MINOR` – backward-compatible feature additions  
 - `PATCH` – bug fixes and internal improvements  
 
-Current version: **1.0.0**
+Current version: **1.0.1**
 ## License
 
 MIT
