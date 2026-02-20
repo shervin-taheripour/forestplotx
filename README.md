@@ -66,14 +66,26 @@ fig, axes = fpx.forest_plot(df, model_type="binom")
 
 ## Supported Model Types
 
-| `model_type` | Link | Effect label | X-axis | Reference line |
-|:-------------|:-----|:-------------|:-------|:---------------|
-| `"binom"` | logit | OR | Odds Ratio (log scale) | 1.0 |
-| `"gamma"` | log | Ratio | Ratio (log scale) | 1.0 |
-| `"linear"` | identity | Coef | Effect Size | 0.0 |
-| `"ordinal"` | logit | OR | Odds Ratio (log scale) | 1.0 |
+`forestplotx` supports multiple regression model families.  
+Effect interpretation and axis scaling are determined by the model family and link function.
+
+| `model_type` | Example models | Link | Effect label (table) | X-axis label | Reference line |
+|:-------------|:---------------|:-----|:---------------------|:-------------|:---------------|
+| `"binom"` | Logistic regression (`glm`, `glmer`) | logit | OR | Odds Ratio (log scale) | 1.0 |
+| `"gamma"` | Gamma GLM / GLMM | log | Ratio | Ratio (log scale) | 1.0 |
+| `"linear"` | Linear regression (`lm`, Gaussian GLM) | identity | β | β (coefficient) | 0.0 |
+| `"ordinal"` | Ordinal regression (`clm`, `clmm`, `polr`) | logit | OR | Odds Ratio (log scale) | 1.0 |
 
 The `link` parameter can override the default — for example, `model_type="binom", link="identity"` will skip exponentiation and plot on a linear scale.
+
+### Interpretation Notes
+
+- **Binomial (logit)** -> Odds Ratios (OR)
+- **Gamma (log link)** -> Multiplicative mean ratios
+- **Linear (identity)** -> Additive regression coefficients (β)
+- **Ordinal (logit)** -> Cumulative Odds Ratios (OR)
+
+Exponentiation is automatically applied for models using log or logit links.
 
 ## Input DataFrame
 
