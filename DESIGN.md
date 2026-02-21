@@ -75,3 +75,24 @@ Each decision below records what was chosen, what was rejected, and why, so the 
 - Layout is optimized for publication use cases, not arbitrary custom typography.
 - Extreme invalid-input scenarios are warned about rather than fully auto-corrected.
 - More adaptive layout and symmetric clipping refinements are deferred to future minor releases.
+
+## Future Consideration: Conditional Asymmetry in One-Sided Data
+Current policy:
+- Axis limits are symmetric around the reference value
+  (log space for ratio models, linear space for identity-link models).
+- This ensures perceptual neutrality and cross-plot comparability.
+
+Observed edge case:
+- In datasets where all effects lie on one side of the reference,
+  symmetric scaling can produce unused whitespace on the opposite side.
+
+Potential refinement (not implemented):
+- Apply a conditional asymmetry heuristic when the empty-side span
+  exceeds a fixed imbalance threshold.
+- Reference line would remain fixed.
+- Tick logic and clipping behavior would remain deterministic.
+- No user-facing parameter would be introduced.
+
+Status:
+- Design note only.
+- No change to current behavior.

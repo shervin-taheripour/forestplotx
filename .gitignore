@@ -25,7 +25,8 @@ forestplot.png
 tests/test_results/
 
 # Project Docs
-prerelease_checklist.mdnotebooks/plot_test.ipynb
+prerelease_checklist.md
+notebooks/plot_test.ipynb
 
 # Local test notebook
 notebooks/plot_test.ipynb
