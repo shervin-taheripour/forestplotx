@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import os
+from pathlib import Path
 from os import PathLike
 from matplotlib.patches import Rectangle
 import textwrap
@@ -677,7 +679,11 @@ def forest_plot(
     fig.patches.append(frame)
 
     if save_path is not None:
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        save_path = os.fspath(save_path)
+        parent = Path(save_path).parent
+        if str(parent) not in ("", "."):
+            parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
 
     if show:
         plt.show()

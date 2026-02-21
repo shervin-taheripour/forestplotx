@@ -230,6 +230,7 @@ def build_cases() -> list[Case]:
         Case("H1", "show true save none", "linear", dict(model_type="linear", show=True, save=None)),
         Case("H2", "show false save path", "linear", dict(model_type="linear", show=False, save="H2_saved.png")),
         Case("H3", "show false save true(default name)", "linear", dict(model_type="linear", show=False, save=True)),
+        Case("H4", "show false save nested path", "linear", dict(model_type="linear", show=False, save="nested/H4_saved.png")),
         # I
         Case("I1", "empty df", "empty", dict(model_type="linear"), expect_error="ValueError"),
         Case("I2", "missing effect", "missing_effect", dict(model_type="linear"), expect_error="ValueError"),

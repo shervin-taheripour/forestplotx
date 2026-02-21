@@ -261,7 +261,7 @@ pytest
 | `tests/test_normalization.py` | `_normalize.py` | 11 |
 | `tests/test_layout.py` | `_layout.py` | 33 |
 | `tests/test_axes_config.py` | `_axes_config.py` | 65 |
-| `tests/test_plot_smoke.py` | `plot.py` | 4 |
+| `tests/test_plot_smoke.py` | `plot.py` | 7 |
 
 ### Coverage summary
 

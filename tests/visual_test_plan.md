@@ -232,13 +232,14 @@ df_linear_with_counts_long_pred.loc[
 
 ---
 
-### H. Save / show behavior (3 tests)
+### H. Save / show behavior (4 tests)
 
 | ID | Call | Verify |
 |:---|:-----|:-------|
 | H1 | `show=True, save=None` | Plot displayed, no file created |
 | H2 | `show=False, save="test_output.png"` | No display, file saved at path, file is valid PNG |
 | H3 | `show=False, save=True` | No display, file saved as `forestplot.png` (default name) |
+| H4 | `show=False, save="nested/test_output.png"` | No display, nested parent directory is auto-created, file saved successfully |
 
 ---
 
@@ -328,5 +329,5 @@ def run_test(test_id, df, description, **kwargs):
 4. **C1–C4** (outcomes) — layout correctness
 5. **E1–E8** (formatting) — visual polish
 6. **F1–F10** (layout params) — structural edge cases including footer and clip_outliers
-7. **H1–H3** (save/show) — output pipeline
+7. **H1–H4** (save/show) — output pipeline
 8. **I1–I4** (error paths) — defensive behavior

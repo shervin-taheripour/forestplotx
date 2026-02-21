@@ -7,6 +7,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- `forest_plot(save=...)` now uses figure-bound saving (`fig.savefig`) instead of global pyplot state (`plt.savefig`), preventing wrong-figure saves in multi-figure/notebook contexts.
+- Save paths are normalized with `os.fspath(...)` before writing.
+- Parent directories for `save` targets are created automatically when missing.
+
+### Added
+- Smoke-test coverage for save behavior:
+  - verifies `Figure.savefig` is used (and `plt.savefig` is not),
+  - verifies nested parent-directory creation for save paths.
+
 ## [1.0.1] - 2026-02-20
 
 ### Fixed
