@@ -163,6 +163,12 @@ Compaction activates only when counts reach `>= 10.000` and uses a shared unit a
 Very large values beyond display range are capped as `>999T` with a warning.
 Rows are fully grayed only when all displayed outcomes are missing; if at least one outcome is valid, only the missing outcome triplet (`effect`, `95% CI`, `p`) is blanked and gray-marked.
 
+### Title Handling
+
+`forest_plot()` intentionally does not include a `title` parameter in v1.
+This is by design for publication workflows where figure titles/captions are managed in the manuscript rather than embedded inside the plot image.
+If needed for slides or reports, add a title externally on the returned matplotlib figure object.
+
 ### Exponentiation Safety
 
 - Use `exponentiate=None` (default) for model/link-based automatic handling.

@@ -76,7 +76,21 @@ Each decision below records what was chosen, what was rejected, and why, so the 
 - Extreme invalid-input scenarios are warned about rather than fully auto-corrected.
 - More adaptive layout and symmetric clipping refinements are deferred to future minor releases.
 
-## Future Consideration: Conditional Asymmetry in One-Sided Data
+## Future Considerations
+
+### 1) Title handling for publication workflows
+Current policy:
+- `forest_plot()` has no `title` parameter by design in v1.
+- This keeps figure geometry deterministic and aligns with journal-style submissions where titles/captions are placed in the manuscript, not inside the PNG/PDF figure.
+
+Potential refinement (not implemented):
+- Add an optional title pathway only if broader presentation/report use cases justify the additional layout complexity.
+
+Status:
+- Design choice is intentional in v1.
+- No change planned solely for publication use cases.
+
+### 2) Conditional asymmetry in one-sided data
 Current policy:
 - Axis limits are symmetric around the reference value
   (log space for ratio models, linear space for identity-link models).
