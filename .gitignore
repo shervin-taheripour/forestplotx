@@ -26,7 +26,6 @@ tests/test_results/
 
 # Project Docs
 prerelease_checklist.md
-notebooks/plot_test.ipynb
 
 # Local test notebook
 notebooks/plot_test.ipynb
