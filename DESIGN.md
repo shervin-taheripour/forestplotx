@@ -1,4 +1,4 @@
-# forestplotx Design Notes (v1.0.1)
+# forestplotx Design Notes (v1.0.2)
 
 ## Scope and Intent
 `forestplotx` targets publication-ready forest plots for common regression outputs with minimal user-side formatting work.  

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "forestplotx"
-version = "1.0.1"
+version = "1.0.2"
 description = "Publication-ready forest plots for regression model outputs in Python."
 readme = "README.md"
 license = "MIT"
