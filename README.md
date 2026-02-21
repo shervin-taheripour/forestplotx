@@ -8,7 +8,7 @@ Publication-ready forest plots for regression model outputs in Python.
 
 `forestplotx` takes DataFrame output from logistic, linear, ordinal, or gamma regression models and produces a combined table + forest plot figure — ready for papers, reports, and presentations.
 
-![Two Outcomes with General Stats](https://raw.githubusercontent.com/shervin-taheripour/forestplotx/v1.0.2/examples/layout_case1_general_true_two_outcomes.png)
+![Comparison After](https://raw.githubusercontent.com/shervin-taheripour/forestplotx/v1.0.2/examples/comparison_after.png)
 
 ## Features
 
