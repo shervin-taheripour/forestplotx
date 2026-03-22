@@ -27,6 +27,11 @@ tests/test_results/
 # Project Docs
 prerelease_checklist.md
 
-# Local test notebook
-notebooks/plot_test.ipynb
+# Editor / local workspace files
+.vscode/
 
+# Local scratch files
+issues.txt
+
+# Local notebooks
+notebooks/
