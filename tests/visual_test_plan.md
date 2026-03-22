@@ -257,7 +257,16 @@ messages are clear and helpful.
 
 ---
 
-### J. Additional stress cases (7 tests)
+### K. Axis tick edge cases (4 tests)
+
+| ID | Base dataset | Axis scenario | Call snippet | Verify |
+|:---|:-------------|:--------------|:-------------|:-------|
+| K1 | `axis_decimal_large` | `tick_style="decimal"` with large values | `model_type="binom", exponentiate=False, tick_style="decimal"` | Large-value decimal ticks use readable selection/spacing; no overlapping edge tick labels |
+| K2 | `axis_decimal_dense` | `tick_style="decimal"` dense around reference | `model_type="gamma", exponentiate=False, tick_style="decimal"` | Extra readable ticks around 1 improve comparison without clutter |
+| K3 | `axis_decimal_onesided` | `tick_style="decimal"` mostly one-sided values | `model_type="binom", exponentiate=False, tick_style="decimal"` | Axis uses sensible one-sided data-driven range; left side not over-expanded |
+| K4 | `axis_power10_large` | `tick_style="power10"` with large values | `model_type="binom", exponentiate=False, tick_style="power10"` | Large-value power10 ticks remain readable and mathematically clean |
+
+### J. Additional stress cases (9 tests)
 
 | ID | Base dataset | Scenario | Call snippet | Verify |
 |:---|:-------------|:---------|:-------------|:-------|
@@ -268,8 +277,10 @@ messages are clear and helpful.
 | J5 | linear | 2 predictors with values + 8 NaN predictors | Use modified dataset with NaN effect/CI for 8 predictors | NaN rows remain listed and appear grayed out in table + forest markers |
 | J6 | linear + counts | Single-outcome partial missing with general stats | Use `df_linear_with_counts_partial_single`, `outcomes=["outcome1"]` | Row remains readable (not full gray), missing outcome triplet blanked, forest marker for missing row shown in gray |
 | J7 | linear + counts | Two-outcome partial missing in one outcome with general stats | Use `df_linear_with_counts_partial_dual`, `outcomes=["outcome1","outcome2"]` | Predictor/general stats remain black when one outcome is valid; only missing outcome triplet blanked and gray marker shown |
+| J8 | edge hurdle raw | Hurdle NB2 (`component="cond"`, no intercept) + multiline footer | `model_type="gamma", exponentiate=None, show_general_stats=False` | Footer keeps 3 user lines; no overlap with x-axis label; no frame overflow |
+| J9 | edge logistic raw | Logistic mixed model (`component="cond"`, no intercept) + long single-line footer | `model_type="binom", exponentiate=None, show_general_stats=False` | Long footer wraps/truncates safely below plot; no overflow into forest/table |
 
-These tests are implemented in `tests/run_visual_tests.py` as `J1`–`J5`.
+These tests are implemented in `tests/run_visual_tests.py` as `J1`–`J9`.
 
 ### K. Predictor truncation stress tests (4 tests)
 

@@ -4,6 +4,7 @@ import pandas as pd
 import os
 from pathlib import Path
 from os import PathLike
+from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Rectangle
 import textwrap
 import warnings
@@ -31,6 +32,8 @@ def forest_plot(
     show: bool = True,
     show_general_stats: bool = True,
     bold_override: dict | None = None,
+    column_labels: dict | None = None,
+    x_label_override: str | None = None,
 ):
     """
     Render a publication-style forest plot with an aligned text table and optional footer.
@@ -81,10 +84,11 @@ def forest_plot(
     tick_style : {"decimal","power10"}, default "decimal"
         Tick label style for log-axis rendering.
     clip_outliers : bool, default False
-        If True, use quantile-based clipping for axis limits to improve readability in
-        outlier-heavy plots. Clipped CIs are marked at axis boundaries.
+        If True, clip extreme axis-driving intervals to improve readability while keeping
+        raw table values unchanged. For log axes, clipping uses a magnitude-based rule
+        centered on the median CI bounds; clipped CIs are marked at axis boundaries.
     clip_quantiles : tuple[float, float], default (0.02, 0.98)
-        Quantiles used when `clip_outliers=True`; must satisfy `0 <= low < high <= 1`.
+        Retained for API compatibility and linear-axis clipping behavior.
     base_decimals : int, default 2
         Decimal precision for effect/CI display (internally capped at 3).
     show : bool, default True
@@ -94,6 +98,10 @@ def forest_plot(
         Show/hide `n`, `N`, and `Freq` table columns.
     bold_override : dict | None, default None
         Optional manual bold override map by predictor/outcome.
+    column_labels : dict | None, default None
+        Optional table-header overrides. Supported keys: `effect`, `ci`, `p`, `n`, `N`, `Freq`.
+    x_label_override : str | None, default None
+        Optional override for the forest-panel x-axis label.
 
     Returns
     -------
@@ -110,6 +118,7 @@ def forest_plot(
         raise TypeError("save must be a path string/path-like, None, or bool.")
 
     bold_override = bold_override or {}
+    column_labels = column_labels or {}
     if outcomes is None:
         outcomes = df["outcome"].unique().tolist()
     if len(outcomes) > 2:
@@ -123,22 +132,65 @@ def forest_plot(
         link=link,
         exponentiate=exponentiate,
     )
-    effect_label = plot_config["effect_label"]
+    effect_label = str(column_labels.get("effect", plot_config["effect_label"]))
     ref_val = plot_config["reference_line"]
     use_log = plot_config["use_log"]
-    xlabel = plot_config["x_label"]
-    ci_label = "95% CI"
+    xlabel = x_label_override if x_label_override is not None else plot_config["x_label"]
+    ci_label = str(column_labels.get("ci", "95% CI"))
+    p_header_label = str(column_labels.get("p", "p"))
+    n_header_label = str(column_labels.get("n", "n"))
+    N_header_label = str(column_labels.get("N", "N"))
+    Freq_header_label = str(column_labels.get("Freq", "Freq"))
     base_decimals = min(int(base_decimals), 3)
     _BLOCK_SPACING = 6.0
 
     def format_effect_ci_p(eff, lo, hi, p):
-        d = base_decimals
-        eff_s = f"{eff:.{d}f}" if pd.notnull(eff) else ""
-        lo_s = f"{lo:.{d}f}" if pd.notnull(lo) else ""
-        hi_s = f"{hi:.{d}f}" if pd.notnull(hi) else ""
+        def _pick_unit(*values):
+            finite = [abs(float(v)) for v in values if pd.notnull(v)]
+            if not finite:
+                return 1.0, ""
+            vmax = max(finite)
+            if vmax < 1_000:
+                return 1.0, ""
+            if vmax >= 1_000_000_000_000:
+                return 1_000_000_000_000.0, "T"
+            if vmax >= 1_000_000_000:
+                return 1_000_000_000.0, "B"
+            if vmax >= 1_000_000:
+                return 1_000_000.0, "M"
+            return 1_000.0, "k"
+
+        def _format_scaled(value, scale, suffix):
+            if pd.isnull(value):
+                return ""
+            scaled = float(value) / scale
+            abs_scaled = abs(scaled)
+            if suffix:
+                if abs_scaled < 10:
+                    decimals = 2
+                elif abs_scaled < 100:
+                    decimals = 1
+                else:
+                    decimals = 0
+            else:
+                if abs_scaled < 10:
+                    decimals = base_decimals
+                elif abs_scaled < 100:
+                    decimals = 1
+                else:
+                    decimals = 0
+            txt = f"{scaled:.{decimals}f}"
+            if "." in txt:
+                txt = txt.rstrip("0").rstrip(".")
+            return f"{txt}{suffix}"
+
+        scale, suffix = _pick_unit(eff, lo, hi)
+        eff_s = _format_scaled(eff, scale, suffix)
+        lo_s = _format_scaled(lo, scale, suffix)
+        hi_s = _format_scaled(hi, scale, suffix)
         ci_s = f"[{lo_s},{hi_s}]" if lo_s and hi_s else ""
         p_s = "" if pd.isnull(p) else ("<0.001" if p < 0.001 else f"{p:.3f}")
-        return eff_s, ci_s, p_s, d
+        return eff_s, ci_s, p_s, base_decimals
 
     layout = build_row_layout(df)
     table_rows = layout["rows"].to_dict("records")
@@ -148,40 +200,38 @@ def forest_plot(
     if n <= 8:
         fig_height = max(0.26 * n + 1.2, 3.4)
 
-    # 4-case layout presets:
-    # (show_general_stats, has_second_outcome) -> geometry config.
-    # For now, all four cases intentionally share the same values.
+    # Fixed 4-case layout presets. Keep these stable so table spacing does not
+    # shift around with the rendered contents.
     layout_presets = {
         (True, True): {
             "block_mult": {"general": 1.06, "outcome1": 1.74, "outcome2": 2.74},
             "general_offsets": [0.0, 1.45, 3.15],
             "outcome_offsets": [0.0, 2.0, 4.1],
-            "fig_width": 16,
+            "fig_width": 16.0,
             "width_ratios": [1.9, 1.1],
         },
         (True, False): {
-            "block_mult": {"general": 1.2, "outcome1": 1.90, "outcome2": 2.9},
-            "general_offsets": [0.0, 1.3, 2.8],
+            "block_mult": {"general": 1.20, "outcome1": 1.90, "outcome2": 2.90},
+            "general_offsets": [0.0, 1.30, 2.80],
             "outcome_offsets": [0.0, 2.0, 4.1],
-            "fig_width": 13,
+            "fig_width": 13.0,
             "width_ratios": [1.9, 1.3],
         },
         (False, True): {
-            "block_mult": {"general": 1.2, "outcome1": 1.30, "outcome2": 2.30},
-            "general_offsets": [0.0, 1.3, 2.6],
-            "outcome_offsets": [0.0, 2.1, 4.3],
-            "fig_width": 14,
+            "block_mult": {"general": 1.20, "outcome1": 1.30, "outcome2": 2.30},
+            "general_offsets": [0.0, 1.30, 2.60],
+            "outcome_offsets": [0.0, 2.10, 4.30],
+            "fig_width": 14.0,
             "width_ratios": [1.9, 1.2],
         },
         (False, False): {
-            "block_mult": {"general": 1.2, "outcome1": 1.2, "outcome2": 2.9},
-            "general_offsets": [0.0, 1.3, 2.6],
+            "block_mult": {"general": 1.20, "outcome1": 1.20, "outcome2": 2.90},
+            "general_offsets": [0.0, 1.30, 2.60],
             "outcome_offsets": [0.0, 2.0, 4.1],
             "fig_width": 9.5,
             "width_ratios": [1.9, 1.2],
         },
     }
-    layout_cfg = layout_presets[(show_general_stats, has_second)]
     predictor_label_caps = {
         (True, True): 21,
         (True, False): 24,
@@ -190,13 +240,6 @@ def forest_plot(
     }
     predictor_label_cap = predictor_label_caps[(show_general_stats, has_second)]
     render_font_size = 10
-    BLOCK_X = {"predictor": 0.0}
-    if show_general_stats:
-        BLOCK_X["general"] = _BLOCK_SPACING * layout_cfg["block_mult"]["general"]
-    BLOCK_X["outcome1"] = _BLOCK_SPACING * layout_cfg["block_mult"]["outcome1"]
-    BLOCK_X["outcome2"] = _BLOCK_SPACING * layout_cfg["block_mult"]["outcome2"]
-    GENERAL_OFFSETS = layout_cfg["general_offsets"]
-    OUTCOME_OFFSETS = layout_cfg["outcome_offsets"]
 
     n_vals_all = (
         pd.to_numeric(df["n"], errors="coerce")
@@ -261,6 +304,15 @@ def forest_plot(
             txt = txt[:-2]
         return f"{txt}{suffix}"
 
+    layout_cfg = dict(layout_presets[(show_general_stats, has_second)])
+    BLOCK_X = {"predictor": 0.0}
+    if show_general_stats:
+        BLOCK_X["general"] = _BLOCK_SPACING * layout_cfg["block_mult"]["general"]
+    BLOCK_X["outcome1"] = _BLOCK_SPACING * layout_cfg["block_mult"]["outcome1"]
+    BLOCK_X["outcome2"] = _BLOCK_SPACING * layout_cfg["block_mult"]["outcome2"]
+    GENERAL_OFFSETS = list(layout_cfg["general_offsets"])
+    OUTCOME_OFFSETS = list(layout_cfg["outcome_offsets"])
+
     predictor_display_map: dict[str, str] = {}
     truncated_predictors: list[str] = []
     for row in table_rows:
@@ -287,18 +339,102 @@ def forest_plot(
         )
     suppressed_null_triplets = 0
 
-    if table_only:
-        fig, ax_text = plt.subplots(1, 1, figsize=(15, fig_height))
-        ax_forest = None
-    else:
-        fig, (ax_text, ax_forest) = plt.subplots(
-            1,
-            2,
-            figsize=(layout_cfg["fig_width"], fig_height),
-            gridspec_kw={"width_ratios": layout_cfg["width_ratios"]},
+    _FRAME_INSET_FRAC = 0.006
+    _CONTENT_LEFT_FRAC = 0.02
+    _CONTENT_RIGHT_FRAC = 0.98
+    _TOP_PAD_IN = 0.12
+    _AXIS_LABEL_BAND_IN = 0.0 if table_only else 0.45
+    _FOOTER_GAP_IN = 0.12
+    _BOTTOM_PAD_IN = 0.10
+
+    footer_display = None
+    footer_line_count = 0
+    footer_height_in = 0.0
+    footer_ax = None
+    raw_footer_lines = []
+    if footer_text:
+        raw_footer_lines = str(footer_text).splitlines() or [str(footer_text)]
+
+    fig_width = 15 if table_only else layout_cfg["fig_width"]
+    if raw_footer_lines:
+        footer_width = _CONTENT_RIGHT_FRAC - _CONTENT_LEFT_FRAC
+        chars_per_line = max(45, int(fig_width * footer_width * 11.0))
+        wrapped_lines = []
+        for raw_line in raw_footer_lines:
+            wrapped = textwrap.wrap(
+                raw_line,
+                width=chars_per_line,
+                break_long_words=False,
+                break_on_hyphens=False,
+            )
+            wrapped_lines.extend(wrapped or [""])
+        max_lines = 3
+        if len(wrapped_lines) > max_lines:
+            wrapped_lines = wrapped_lines[:max_lines]
+            if wrapped_lines[-1]:
+                wrapped_lines[-1] = wrapped_lines[-1].rstrip(". ") + "..."
+        footer_display = "\n".join(wrapped_lines)
+        footer_line_count = len(wrapped_lines)
+        footer_font_size = render_font_size * 0.9
+        line_height_in = (footer_font_size / 72.0) * 1.35
+        footer_height_in = max(0.22, footer_line_count * line_height_in + 0.08)
+
+    main_height_in = fig_height
+    footer_gap_in  = _FOOTER_GAP_IN if footer_display else 0.0
+    footer_h_in    = footer_height_in if footer_display else 0.0
+
+    total_height = (
+        _TOP_PAD_IN
+        + main_height_in
+        + _AXIS_LABEL_BAND_IN
+        + footer_gap_in
+        + footer_h_in
+        + _BOTTOM_PAD_IN
+    )
+
+    bottom_pad_frac = _BOTTOM_PAD_IN / total_height
+    footer_h_frac = footer_h_in / total_height
+    footer_gap_frac = footer_gap_in / total_height
+    axis_label_band_frac = _AXIS_LABEL_BAND_IN / total_height
+    main_h_frac = main_height_in / total_height
+
+    main_bottom_frac = (
+        bottom_pad_frac + footer_h_frac + footer_gap_frac + axis_label_band_frac
+    )
+    main_top_frac = main_bottom_frac + main_h_frac
+    footer_bottom_frac = bottom_pad_frac
+    footer_top_frac = footer_bottom_frac + footer_h_frac
+
+    ncols = 1 if table_only else 2
+    width_ratios = [1] if table_only else layout_cfg["width_ratios"]
+    wspace = 0.0 if table_only else 0.02
+
+    fig = plt.figure(figsize=(fig_width, total_height))
+
+    gs_main = GridSpec(
+        1, ncols,
+        figure=fig,
+        left=_CONTENT_LEFT_FRAC,
+        right=_CONTENT_RIGHT_FRAC,
+        bottom=main_bottom_frac,
+        top=main_top_frac,
+        width_ratios=width_ratios,
+        wspace=wspace,
+    )
+
+    ax_text = fig.add_subplot(gs_main[0, 0])
+    ax_forest = None if table_only else fig.add_subplot(gs_main[0, ncols - 1])
+
+    if footer_display:
+        gs_foot = GridSpec(
+            1, 1,
+            figure=fig,
+            left=_CONTENT_LEFT_FRAC,
+            right=_CONTENT_RIGHT_FRAC,
+            bottom=footer_bottom_frac,
+            top=footer_top_frac,
         )
-        plt.subplots_adjust(wspace=0.02)
-        plt.subplots_adjust(bottom=0.12)
+        footer_ax = fig.add_subplot(gs_foot[0, 0])
 
     header_row_1, header_row_2 = -2.2, -1.0
     general_header_artists = [None, None, None]
@@ -313,7 +449,7 @@ def forest_plot(
         fontsize=render_font_size,
     )
     if show_general_stats:
-        for i, label in enumerate(["n", "N", "Freq"]):
+        for i, label in enumerate([n_header_label, N_header_label, Freq_header_label]):
             col_x = BLOCK_X["general"] + GENERAL_OFFSETS[i]
             general_header_artists[i] = ax_text.text(
                 col_x,
@@ -333,7 +469,7 @@ def forest_plot(
         fontweight="bold",
         fontsize=render_font_size,
     )
-    for i, label in enumerate([effect_label, ci_label, "p"]):
+    for i, label in enumerate([effect_label, ci_label, p_header_label]):
         ax_text.text(
             BLOCK_X["outcome1"] + OUTCOME_OFFSETS[i],
             header_row_2,
@@ -353,7 +489,7 @@ def forest_plot(
             fontweight="bold",
             fontsize=render_font_size,
         )
-        for i, label in enumerate([effect_label, ci_label, "p"]):
+        for i, label in enumerate([effect_label, ci_label, p_header_label]):
             ax_text.text(
                 BLOCK_X["outcome2"] + OUTCOME_OFFSETS[i],
                 header_row_2,
@@ -648,29 +784,26 @@ def forest_plot(
             stacklevel=2,
         )
 
-    if footer_text:
-        wrapped = textwrap.wrap(str(footer_text), width=150)
-        max_lines = 3
-        if len(wrapped) > max_lines:
-            wrapped = wrapped[:max_lines]
-            if wrapped[-1]:
-                wrapped[-1] = wrapped[-1].rstrip(". ") + "..."
-        footer_display = "\n".join(wrapped)
-        fig.text(
+    if footer_display and footer_ax is not None:
+        footer_ax.axis("off")
+        footer_ax.text(
             0.5,
-            0.01,
+            0.5,
             footer_display,
             ha="center",
-            va="bottom",
+            va="center",
             fontsize=render_font_size * 0.9,
             color="dimgray",
             style="italic",
+            wrap=True,
+            clip_on=True,
+            transform=footer_ax.transAxes,
         )
 
     frame = Rectangle(
-        (0.12, 0.005),
-        0.8,
-        0.9,
+        (_FRAME_INSET_FRAC, _FRAME_INSET_FRAC),
+        1.0 - 2.0 * _FRAME_INSET_FRAC,
+        1.0 - 2.0 * _FRAME_INSET_FRAC,
         transform=fig.transFigure,
         color="black",
         lw=1.2,
@@ -683,7 +816,7 @@ def forest_plot(
         parent = Path(save_path).parent
         if str(parent) not in ("", "."):
             parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+        fig.savefig(save_path, dpi=300)
 
     if show:
         plt.show()

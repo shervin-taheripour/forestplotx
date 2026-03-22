@@ -119,18 +119,6 @@ def configure_forest_axis(
         if not len(finite_lo) or not len(finite_hi):
             return ax
 
-        if clip_outliers:
-            q_low, q_high = clip_quantiles
-            q_low = float(q_low)
-            q_high = float(q_high)
-            if not (0.0 <= q_low < q_high <= 1.0):
-                raise ValueError("clip_quantiles must satisfy 0 <= low < high <= 1.")
-            data_min = float(np.quantile(finite_lo, q_low))
-            data_max = float(np.quantile(finite_hi, q_high))
-        else:
-            data_min = float(np.min(finite_lo))
-            data_max = float(np.max(finite_hi))
-
         ax.set_xscale("log" if use_log else "linear")
 
         if use_log:
@@ -154,12 +142,11 @@ def configure_forest_axis(
                     UserWarning,
                     stacklevel=2,
                 )
+            positive_lo = finite_lo[finite_lo > 0]
+            positive_hi = finite_hi[finite_hi > 0]
+            positive_eff = finite_eff[finite_eff > 0]
             positive_values = np.concatenate(
-                [
-                    finite_lo[finite_lo > 0],
-                    finite_hi[finite_hi > 0],
-                    finite_eff[finite_eff > 0],
-                ]
+                [positive_lo, positive_hi, positive_eff]
             )
             positive_candidates = [*positive_values.tolist(), ref_val]
             if not positive_candidates:
@@ -167,27 +154,113 @@ def configure_forest_axis(
                     "Log-scaled forest axis requires positive effect/CI values."
                 )
 
-            pmin = min(positive_candidates)
-            pmax = max(positive_candidates)
-            target_ticks = max(int(num_ticks), 3)
-            if target_ticks % 2 == 0:
-                target_ticks -= 1
-            n_side_target = max((target_ticks - 1) // 2, 1)
+            if clip_outliers and len(positive_values):
+                clip_factor = 10.0
 
-            span_decades = max(abs(math.log10(pmin / ref_val)), abs(math.log10(pmax / ref_val)))
-            axis_span_decades = span_decades * 1.15
-            # Keep very tight ranges readable around the reference line.
-            axis_span_decades = max(axis_span_decades, 0.01)
-            raw_step = axis_span_decades / n_side_target
-            step_decades = _nice_log_step(raw_step)
-            n_side = max(1, int(axis_span_decades / step_decades))
-            exponents = np.arange(-n_side, n_side + 1, dtype=float) * step_decades
-            ticks = ref_val * np.power(10.0, exponents)
-            axis_ratio = 10 ** axis_span_decades
-            xmin = ref_val / axis_ratio
-            xmax = ref_val * axis_ratio
+                if len(positive_lo):
+                    lo_baseline = float(np.median(positive_lo))
+                    lo_threshold = lo_baseline / clip_factor if lo_baseline > 0 else 0.0
+                    lo_inliers = positive_lo[positive_lo >= lo_threshold]
+                    clipped_pmin = float(np.min(lo_inliers)) if len(lo_inliers) else float(np.min(positive_lo))
+                else:
+                    clipped_pmin = float(np.min(positive_values))
+
+                if len(positive_hi):
+                    hi_baseline = float(np.median(positive_hi))
+                    hi_threshold = hi_baseline * clip_factor
+                    hi_inliers = positive_hi[positive_hi <= hi_threshold]
+                    clipped_pmax = float(np.max(hi_inliers)) if len(hi_inliers) else float(np.max(positive_hi))
+                else:
+                    clipped_pmax = float(np.max(positive_values))
+
+                pmin = min(clipped_pmin, ref_val)
+                pmax = max(clipped_pmax, ref_val)
+            else:
+                pmin = min(positive_candidates)
+                pmax = max(positive_candidates)
+            target_ticks = max(int(num_ticks), 3)
+            log_min = math.log10(pmin)
+            log_max = math.log10(pmax)
+            span_decades = max(log_max - log_min, 0.0)
+            pad_decades = max(0.08, min(0.25, span_decades * 0.08))
+            axis_log_min = log_min - pad_decades
+            axis_log_max = log_max + pad_decades
+            axis_span_decades = axis_log_max - axis_log_min
+
+            raw_step = axis_span_decades / max(target_ticks - 1, 1)
+            if span_decades > 3:
+                step_decades = max(1.0, _nice_log_step(raw_step))
+            else:
+                step_decades = _nice_log_step(raw_step)
+
+            tick_start = math.ceil(axis_log_min / step_decades) * step_decades
+            tick_end = math.floor(axis_log_max / step_decades) * step_decades
+            if tick_end < tick_start:
+                tick_logs = np.array([axis_log_min, 0.0, axis_log_max], dtype=float)
+            else:
+                tick_logs = np.arange(
+                    tick_start,
+                    tick_end + 0.5 * step_decades,
+                    step_decades,
+                )
+                if not np.any(np.isclose(tick_logs, 0.0, atol=1e-9)):
+                    tick_logs = np.sort(np.append(tick_logs, 0.0))
+
+            xmin = 10 ** axis_log_min
+            xmax = 10 ** axis_log_max
             ax.set_xlim(xmin, xmax)
-            ticks_in = ticks[(ticks >= xmin) & (ticks <= xmax)]
+            ticks_in = np.power(10.0, tick_logs)
+            ticks_in = ticks_in[(ticks_in >= xmin) & (ticks_in <= xmax)]
+            ticks_in = np.unique(np.asarray(ticks_in, dtype=float))
+
+            tick_data_min = max(pmin, np.nextafter(0.0, 1.0))
+            tick_data_max = pmax
+            moderate_decimal_span = (
+                tick_style == "decimal"
+                and pmin >= 0.2
+                and pmax <= 10.0
+                and span_decades <= 1.4
+            )
+            if moderate_decimal_span:
+                readable_ticks = np.array(
+                    [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0],
+                    dtype=float,
+                )
+                ticks_in = readable_ticks[(readable_ticks >= tick_data_min) & (readable_ticks <= tick_data_max)]
+                if len(ticks_in) > 8:
+                    keep = []
+                    for idx, tick in enumerate(ticks_in):
+                        if idx % 2 == 0 or math.isclose(tick, 1.0, abs_tol=1e-9):
+                            keep.append(tick)
+                    ticks_in = np.array(sorted(set(keep)), dtype=float)
+            elif tick_style == "decimal":
+                decade_min = int(math.floor(axis_log_min))
+                decade_max = int(math.ceil(axis_log_max))
+                readable_ticks = []
+                for decade in range(decade_min, decade_max + 1):
+                    base = 10.0 ** decade
+                    for mult in (1.0, 2.0, 5.0):
+                        tick = mult * base
+                        if tick_data_min <= tick <= tick_data_max:
+                            readable_ticks.append(tick)
+                if readable_ticks:
+                    ticks_in = np.array(sorted(set(readable_ticks)), dtype=float)
+                    if not np.any(np.isclose(ticks_in, ref_val, atol=1e-9)) and tick_data_min <= ref_val <= tick_data_max:
+                        ticks_in = np.array(sorted(np.append(ticks_in, ref_val)), dtype=float)
+                    if len(ticks_in) > 9:
+                        min_log_gap = axis_span_decades / 7.0
+                        keep = [float(ticks_in[0])]
+                        for tick in ticks_in[1:-1]:
+                            if math.isclose(tick, ref_val, abs_tol=1e-9):
+                                keep.append(float(tick))
+                                continue
+                            if math.log10(float(tick)) - math.log10(float(keep[-1])) >= min_log_gap:
+                                keep.append(float(tick))
+                        keep.append(float(ticks_in[-1]))
+                        if tick_data_min <= ref_val <= tick_data_max and not any(math.isclose(t, ref_val, abs_tol=1e-9) for t in keep):
+                            keep.append(ref_val)
+                        ticks_in = np.array(sorted(set(keep)), dtype=float)
+
             if len(ticks_in) < 3:
                 ticks_in = np.array([xmin, ref_val, xmax], dtype=float)
             ax.xaxis.set_major_locator(FixedLocator(ticks_in))
@@ -195,25 +268,48 @@ def configure_forest_axis(
             if tick_style == "power10":
 
                 def _power10_formatter(x: float, _pos: int) -> str:
-                    exp = math.log10(x / ref_val)
-                    rounded = round(exp, 2)
-                    if math.isclose(rounded, 0.0, abs_tol=1e-9):
-                        rounded = 0.0
-                    exp_txt = f"{rounded:.2f}".rstrip("0").rstrip(".")
-                    if math.isclose(ref_val, 1.0):
-                        return rf"$10^{{{exp_txt}}}$"
-                    return rf"${_format_decimal(ref_val)}\times10^{{{exp_txt}}}$"
+                    exp = round(math.log10(x), 6)
+                    if math.isclose(exp, round(exp), abs_tol=1e-9):
+                        exp_txt = str(int(round(exp)))
+                    else:
+                        exp_txt = f"{exp:.2f}".rstrip("0").rstrip(".")
+                    return rf"$10^{{{exp_txt}}}$"
 
                 ax.xaxis.set_major_formatter(FuncFormatter(_power10_formatter))
             else:
-                decimals = max(2, _decimals_from_ticks(ticks_in))
-                ax.xaxis.set_major_formatter(
-                    FuncFormatter(lambda x, _pos, d=decimals: f"{x:.{d}f}")
-                )
+                decimals = _decimals_from_ticks(ticks_in)
+
+                def _decimal_log_formatter(x: float, _pos: int, d: int = decimals) -> str:
+                    abs_x = abs(float(x))
+                    if abs_x >= 1e12:
+                        return _format_decimal(x / 1e12, precision=1).rstrip("0").rstrip(".") + "T"
+                    if abs_x >= 1e9:
+                        return _format_decimal(x / 1e9, precision=1).rstrip("0").rstrip(".") + "B"
+                    if abs_x >= 1e6:
+                        return _format_decimal(x / 1e6, precision=1).rstrip("0").rstrip(".") + "M"
+                    if abs_x >= 1e3:
+                        return _format_decimal(x / 1e3, precision=1).rstrip("0").rstrip(".") + "k"
+                    if abs_x >= 10:
+                        return _format_decimal(x, precision=0)
+                    return _format_decimal(x, precision=max(d + 1, 1))
+
+                ax.xaxis.set_major_formatter(FuncFormatter(_decimal_log_formatter))
 
             ax.xaxis.set_minor_locator(NullLocator())
             ax.xaxis.set_minor_formatter(NullFormatter())
         else:
+            if clip_outliers:
+                q_low, q_high = clip_quantiles
+                q_low = float(q_low)
+                q_high = float(q_high)
+                if not (0.0 <= q_low < q_high <= 1.0):
+                    raise ValueError("clip_quantiles must satisfy 0 <= low < high <= 1.")
+                data_min = float(np.quantile(finite_lo, q_low))
+                data_max = float(np.quantile(finite_hi, q_high))
+            else:
+                data_min = float(np.min(finite_lo))
+                data_max = float(np.max(finite_hi))
+
             if clip_outliers:
                 q_high = float(clip_quantiles[1])
                 # Linear outliers are visually dominant; keep clipping robust by capping

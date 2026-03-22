@@ -2,6 +2,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 from matplotlib.figure import Figure
 import pandas as pd
 import pytest
@@ -136,11 +137,13 @@ def test_forest_plot_save_uses_figure_savefig_not_pyplot(monkeypatch, tmp_path):
     )
     out = tmp_path / "plot.png"
     calls = {"fig": 0, "plt": 0}
+    save_kwargs = []
 
     orig_fig_savefig = Figure.savefig
 
     def _fig_savefig(self, *args, **kwargs):
         calls["fig"] += 1
+        save_kwargs.append(dict(kwargs))
         return orig_fig_savefig(self, *args, **kwargs)
 
     def _plt_savefig(*args, **kwargs):
@@ -154,6 +157,62 @@ def test_forest_plot_save_uses_figure_savefig_not_pyplot(monkeypatch, tmp_path):
     assert out.exists()
     assert calls["fig"] == 1
     assert calls["plt"] == 0
+    assert "bbox_inches" not in save_kwargs[0]
+    plt.close(fig)
+
+
+def test_forest_plot_keeps_forest_axis_bbox_inside_figure_without_footer():
+    df = pd.DataFrame(
+        {
+            "predictor": ["x1", "x2", "x3", "x4"],
+            "outcome": ["y1", "y1", "y1", "y1"],
+            "Estimate": [0.0, 0.2, -0.1, 0.15],
+            "CI_low": [-0.1, 0.1, -0.2, 0.05],
+            "CI_high": [0.1, 0.3, 0.0, 0.25],
+            "p_value": [0.2, 0.01, 0.3, 0.04],
+        }
+    )
+
+    fig, (_ax_text, ax_forest) = forest_plot(
+        df=df,
+        model_type="linear",
+        show=False,
+    )
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    forest_bbox = ax_forest.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
+
+    assert forest_bbox.y0 >= 0.0
+    plt.close(fig)
+
+
+def test_forest_plot_footer_sits_in_dedicated_band_below_main_axes():
+    df = pd.DataFrame(
+        {
+            "predictor": ["x1", "x2", "x3", "x4"],
+            "outcome": ["y1", "y1", "y1", "y1"],
+            "Estimate": [0.0, 0.2, -0.1, 0.15],
+            "CI_low": [-0.1, 0.1, -0.2, 0.05],
+            "CI_high": [0.1, 0.3, 0.0, 0.25],
+            "p_value": [0.2, 0.01, 0.3, 0.04],
+        }
+    )
+
+    fig, (ax_text, ax_forest) = forest_plot(
+        df=df,
+        model_type="linear",
+        footer_text="Adjusted for age and sex",
+        show=False,
+    )
+
+    assert len(fig.axes) == 3
+    footer_ax = fig.axes[-1]
+    assert footer_ax.get_position().y1 < ax_text.get_position().y0
+    assert footer_ax.get_position().y1 < ax_forest.get_position().y0
+
+    frame = next(patch for patch in fig.patches if isinstance(patch, Rectangle))
+    assert frame.get_y() <= footer_ax.get_position().y0
     plt.close(fig)
 
 

@@ -169,6 +169,84 @@ def build_modified_datasets(ds: dict[str, pd.DataFrame]) -> dict[str, pd.DataFra
     d.loc[d["predictor"] == first_pred, "predictor"] = long_pred
     out["linear_with_counts_long_pred"] = d
 
+    # G16: Real-world edge case (hurdle neg bin), cond component only, single outcome.
+    edge_dir = ROOT / "data" / "edge_cases"
+    d = pd.read_csv(edge_dir / "fixed_effects_raw.csv")
+    d = d[(d["component"] == "cond") & (d["term"] != "(Intercept)")].copy()
+    d_plot = pd.DataFrame(
+        {
+            "predictor": d["term"],
+            "outcome": "Publication count",
+            "Estimate": d["estimate"],
+            "CI_low": d["conf.low"],
+            "CI_high": d["conf.high"],
+            "p_value": d["p.value"],
+        }
+    )
+    for c in ("Estimate", "CI_low", "CI_high", "p_value"):
+        d_plot[c] = pd.to_numeric(d_plot[c], errors="coerce")
+    out["edge_hurdle_cond"] = d_plot
+
+    # G17: Real-world edge case (logistic mixed model), cond component only, single outcome.
+    d = pd.read_csv(edge_dir / "quality_partA_fixed_effects_raw.csv")
+    d = d[(d["component"] == "cond") & (d["term"] != "(Intercept)")].copy()
+    d_plot = pd.DataFrame(
+        {
+            "predictor": d["term"],
+            "outcome": "Quality part A",
+            "Estimate": d["estimate"],
+            "CI_low": d["conf.low"],
+            "CI_high": d["conf.high"],
+            "p_value": d["p.value"],
+        }
+    )
+    for c in ("Estimate", "CI_low", "CI_high", "p_value"):
+        d_plot[c] = pd.to_numeric(d_plot[c], errors="coerce")
+    out["edge_logit_cond"] = d_plot
+
+    # G18: Axis decimal large values (single outcome, already exponentiated ORs).
+    out["axis_decimal_large"] = pd.DataFrame(
+        [
+            {"predictor": "predictor1", "category": "category1", "outcome": "outcome1", "OR": 1.02, "CI_low": 0.95, "CI_high": 1.11, "p_value": 0.019, "n": 2000, "N": 8000},
+            {"predictor": "predictor2", "category": "category1", "outcome": "outcome1", "OR": 0.97, "CI_low": 0.88, "CI_high": 1.08, "p_value": 0.165, "n": 8600, "N": 5200},
+            {"predictor": "predictor3", "category": "category1", "outcome": "outcome1", "OR": 31.8, "CI_low": 8.13, "CI_high": 124.0, "p_value": 0.0002, "n": 8700, "N": 8500},
+            {"predictor": "predictor4", "category": "category2", "outcome": "outcome1", "OR": 74.7, "CI_low": 18.6, "CI_high": 300.0, "p_value": 0.0001, "n": 5600, "N": 1600},
+            {"predictor": "predictor5", "category": "category2", "outcome": "outcome1", "OR": 210.0, "CI_low": 120.0, "CI_high": 390.0, "p_value": 0.146, "n": 5300, "N": 2300},
+            {"predictor": "predictor6", "category": "category2", "outcome": "outcome1", "OR": 5400000.0, "CI_low": 2100000.0, "CI_high": 12000000.0, "p_value": 0.0001, "n": 990900, "N": 937300},
+        ]
+    )
+
+    # G19: Axis decimal dense near reference (single outcome gamma-like ratios).
+    out["axis_decimal_dense"] = pd.DataFrame(
+        [
+            {"predictor": "predictor1",  "category": "category1", "outcome": "outcome1", "Ratio": 1.02, "CI_low": 1.01, "CI_high": 1.03, "p_value": 0.0008},
+            {"predictor": "predictor2",  "category": "category1", "outcome": "outcome1", "Ratio": 0.67, "CI_low": 0.54, "CI_high": 0.84, "p_value": 0.0009},
+            {"predictor": "predictor3",  "category": "category1", "outcome": "outcome1", "Ratio": 0.46, "CI_low": 0.21, "CI_high": 1.12, "p_value": 0.0880},
+            {"predictor": "predictor4",  "category": "category2", "outcome": "outcome1", "Ratio": 0.72, "CI_low": 0.30, "CI_high": 1.75, "p_value": 0.4690},
+            {"predictor": "predictor5",  "category": "category2", "outcome": "outcome1", "Ratio": 1.30, "CI_low": 0.53, "CI_high": 3.19, "p_value": 0.5620},
+            {"predictor": "predictor6",  "category": "category2", "outcome": "outcome1", "Ratio": 0.86, "CI_low": 0.69, "CI_high": 1.06, "p_value": 0.1570},
+            {"predictor": "predictor7",  "category": "category3", "outcome": "outcome1", "Ratio": 1.75, "CI_low": 1.35, "CI_high": 2.26, "p_value": 0.0004},
+            {"predictor": "predictor8",  "category": "category3", "outcome": "outcome1", "Ratio": 1.41, "CI_low": 1.13, "CI_high": 1.75, "p_value": 0.0020},
+            {"predictor": "predictor9",  "category": "category4", "outcome": "outcome1", "Ratio": 1.18, "CI_low": 0.92, "CI_high": 1.48, "p_value": 0.0710},
+            {"predictor": "predictor10", "category": "category4", "outcome": "outcome1", "Ratio": 0.91, "CI_low": 0.74, "CI_high": 1.09, "p_value": 0.1810},
+        ]
+    )
+
+    # G20: Axis decimal one-sided values (mostly above reference).
+    out["axis_decimal_onesided"] = pd.DataFrame(
+        [
+            {"predictor": "predictor1", "category": "category1", "outcome": "outcome1", "OR": 1.07, "CI_low": 1.05, "CI_high": 1.10, "p_value": 0.0008},
+            {"predictor": "predictor2", "category": "category1", "outcome": "outcome1", "OR": 1.46, "CI_low": 0.88, "CI_high": 2.45, "p_value": 0.1460},
+            {"predictor": "predictor3", "category": "category1", "outcome": "outcome1", "OR": 3.91, "CI_low": 1.05, "CI_high": 14.60, "p_value": 0.0430},
+            {"predictor": "predictor4", "category": "category2", "outcome": "outcome1", "OR": 7.19, "CI_low": 3.19, "CI_high": 16.18, "p_value": 0.0001},
+            {"predictor": "predictor5", "category": "category2", "outcome": "outcome1", "OR": 31.8, "CI_low": 8.13, "CI_high": 124.0, "p_value": 0.0001},
+            {"predictor": "predictor6", "category": "category2", "outcome": "outcome1", "OR": 74.7, "CI_low": 18.6, "CI_high": 300.0, "p_value": 0.0001},
+        ]
+    )
+
+    # G21: Axis power10 large values uses same stress data as decimal-large.
+    out["axis_power10_large"] = out["axis_decimal_large"].copy()
+
     # Error-path helpers
     out["empty"] = pd.DataFrame(
         columns=["predictor", "outcome", "Estimate", "CI_low", "CI_high"]
@@ -236,6 +314,11 @@ def build_cases() -> list[Case]:
         Case("I2", "missing effect", "missing_effect", dict(model_type="linear"), expect_error="ValueError"),
         Case("I3", "invalid model_type", "linear", dict(model_type="poisson"), expect_error="ValueError"),
         Case("I4", "category all NaN", "binom_cat_nan", dict(model_type="binom", exponentiate=False)),
+        # K: axis tick edge cases
+        Case("K1", "decimal large values", "axis_decimal_large", dict(model_type="binom", exponentiate=False, tick_style="decimal", show_general_stats=True, outcomes=["outcome1"])),
+        Case("K2", "decimal dense around reference", "axis_decimal_dense", dict(model_type="gamma", exponentiate=False, tick_style="decimal", show_general_stats=False, outcomes=["outcome1"])),
+        Case("K3", "decimal one-sided values", "axis_decimal_onesided", dict(model_type="binom", exponentiate=False, tick_style="decimal", show_general_stats=False, outcomes=["outcome1"])),
+        Case("K4", "power10 large values", "axis_power10_large", dict(model_type="binom", exponentiate=False, tick_style="power10", show_general_stats=True, outcomes=["outcome1"])),
         # J
         Case("J1", "footer extremely long", "binom", dict(model_type="binom", exponentiate=False, footer_text="Adjusted for age, sex, BMI, smoking status, diabetes, hypertension, prior cardiovascular events, renal function stage, liver function profile, frailty index, baseline medication burden, and center-level random effects; sensitivity analyses excluded protocol deviations, missing baseline laboratory panels, and incomplete follow-up observations across all treatment strata.")),
         Case("J2", "footer multiline (3 lines)", "binom", dict(model_type="binom", exponentiate=False, footer_text="Line 1: adjusted for age/sex\nLine 2: robust SE + center effects\nLine 3: sensitivity excludes missing labs")),
@@ -244,6 +327,37 @@ def build_cases() -> list[Case]:
         Case("J5", "2 predictors with values + 8 NaN (gray rows)", "linear_2_with_values_8_nan", dict(model_type="linear")),
         Case("J6", "single-outcome partial missing with general stats", "linear_with_counts_partial_single", dict(model_type="linear", show_general_stats=True, outcomes=["outcome1"])),
         Case("J7", "two-outcome partial missing one outcome with general stats", "linear_with_counts_partial_dual", dict(model_type="linear", show_general_stats=True, outcomes=["outcome1", "outcome2"])),
+        Case(
+            "J8",
+            "edge hurdle cond with multiline footer",
+            "edge_hurdle_cond",
+            dict(
+                model_type="gamma",
+                exponentiate=None,
+                clip_outliers=False,
+                show_general_stats=False,
+                footer_text=(
+                    "Hurdle negative binomial mixed model (truncated NB2).\n"
+                    "Random intercepts for university and author.\n"
+                    "Reference line at IRR = 1."
+                ),
+            ),
+        ),
+        Case(
+            "J9",
+            "edge logistic cond with long footer line",
+            "edge_logit_cond",
+            dict(
+                model_type="binom",
+                exponentiate=None,
+                clip_outliers=False,
+                show_general_stats=False,
+                footer_text=(
+                    "Logistic mixed-effects model for quality outcome part A. Random intercepts for university and author. "
+                    "Reference line at OR = 1."
+                ),
+            ),
+        ),
         # K: long predictor truncation behavior
         Case("K1", "long predictor label (True, True)", "linear_with_counts_long_pred", dict(model_type="linear", show_general_stats=True, outcomes=["outcome1", "outcome2"])),
         Case("K2", "long predictor label (True, False)", "linear_with_counts_long_pred", dict(model_type="linear", show_general_stats=True, outcomes=["outcome1"])),

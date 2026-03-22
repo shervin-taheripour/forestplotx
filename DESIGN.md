@@ -48,22 +48,29 @@ Each decision below records what was chosen, what was rejected, and why, so the 
   - Trade-off: extra warnings, fewer silent mistakes.
 
 - **Axis readability prioritized over strict data-bound scaling**:
-  - Tight-range log handling ensures readable ticks around reference.
-  - Minimum visible tick structure enforced for very narrow spans.
-  - Trade-off: small synthetic padding may be added to improve interpretation.
+  - Log-axis limits are data-driven after optional clipping rather than being forced symmetric around the reference.
+  - Decimal log ticks use dense near-reference labels for moderate spans and `1-2-5` style progression for wider spans.
+  - `power10` mode keeps readable exponent labels for very wide ranges.
+  - Trade-off: exact mathematical symmetry is sometimes sacrificed for readability.
 
 - **Outlier clipping is opt-in**:
   - `clip_outliers=False` by default to avoid hiding information silently.
-  - When enabled, quantile-based clipping improves readability in outlier-heavy plots.
+  - When enabled on log axes, clipping uses a magnitude-based rule centered on the median CI bounds so small samples with one extreme interval remain readable.
   - Trade-off: defaults preserve raw scale; optional mode improves practical interpretability.
 
 - **Precision and formatting guardrails**:
   - `base_decimals` capped at 3 to protect table layout.
   - CI rendered as bracketed intervals (`[low,high]`) to avoid sign ambiguity.
-  - General stats counts switch to compact units only at `>= 10.000`, using one shared unit across `n` and `N` (`k/M/B/T`) for consistency.
+  - General stats counts switch to compact units only at `>= 1,000`, using one shared unit across `n` and `N` (`k/M/B/T`) for consistency.
   - Extremely large counts are display-capped (`>999T`) with warning rather than overflowing layout.
+  - Effect and CI values use the same compact unit family from `>= 1,000`, with deterministic decimal trimming for both raw and compact displays.
   - Missing-value rendering is strict per outcome triplet (`effect`, CI, `p`): partial-missing triplets are blanked; full-row gray is used only when all displayed outcomes are missing.
   - Long footers wrapped and capped to prevent layout breakage.
+
+- **Visible-label overrides are explicit, not model-dependent**:
+  - `column_labels` allows header overrides for `effect`, `ci`, `p`, `n`, `N`, and `Freq`.
+  - `x_label_override` allows direct x-axis label overrides without changing model normalization behavior.
+  - Trade-off: small API expansion, much simpler manuscript-specific labeling.
 
 ## Quality and Release Discipline
 - Unit and behavior tests for each internal module (`pytest`).
@@ -74,7 +81,7 @@ Each decision below records what was chosen, what was rejected, and why, so the 
 ## Known Boundaries (v1)
 - Layout is optimized for publication use cases, not arbitrary custom typography.
 - Extreme invalid-input scenarios are warned about rather than fully auto-corrected.
-- More adaptive layout and symmetric clipping refinements are deferred to future minor releases.
+- Footer composition remains more constrained than the main table/axis system and may still need a later dedicated redesign if more footer-heavy publication layouts are required.
 
 ## Future Considerations
 
@@ -90,23 +97,13 @@ Status:
 - Design choice is intentional in v1.
 - No change planned solely for publication use cases.
 
-### 2) Conditional asymmetry in one-sided data
+### 2) Further footer/layout cleanup
 Current policy:
-- Axis limits are symmetric around the reference value
-  (log space for ratio models, linear space for identity-link models).
-- This ensures perceptual neutrality and cross-plot comparability.
-
-Observed edge case:
-- In datasets where all effects lie on one side of the reference,
-  symmetric scaling can produce unused whitespace on the opposite side.
+- Main panel spacing and axis logic are deterministic and stable.
+- Footer placement is functional and bounded, but still more fragile than the rest of the composition.
 
 Potential refinement (not implemented):
-- Apply a conditional asymmetry heuristic when the empty-side span
-  exceeds a fixed imbalance threshold.
-- Reference line would remain fixed.
-- Tick logic and clipping behavior would remain deterministic.
-- No user-facing parameter would be introduced.
+- Move footer into a fully isolated physical-unit layout path with fewer interactions between frame, xlabel, and footer text block.
 
 Status:
-- Design note only.
-- No change to current behavior.
+- Deferred.
