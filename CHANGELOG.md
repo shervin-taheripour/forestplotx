@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-03-22
 
 ### Added
 - `forest_plot()` now supports `column_labels` for visible table-header overrides (`effect`, `ci`, `p`, `n`, `N`, `Freq`).
